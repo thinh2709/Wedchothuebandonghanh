@@ -43,13 +43,6 @@ function readAuthEvidence() {
 }
 
 async function ensureAdminAccess() {
-    const auth = readAuthEvidence();
-    const hasAnyAuthSignal = auth.hasSessionCookie || auth.hasUserId || auth.hasToken || auth.role === "ADMIN";
-    if (!hasAnyAuthSignal) {
-        window.location.href = "/user/login.html";
-        return false;
-    }
-
     try {
         const me = await requestJson("/api/auth/me", { method: "GET" });
         if (!me?.authenticated || me.role !== "ADMIN") {
@@ -58,6 +51,11 @@ async function ensureAdminAccess() {
         }
         return true;
     } catch (_) {
+        const auth = readAuthEvidence();
+        const hasAdminSignal = auth.role === "ADMIN" && (auth.hasUserId || auth.hasToken || auth.hasSessionCookie);
+        if (hasAdminSignal) {
+            return true;
+        }
         window.location.href = "/user/login.html";
         return false;
     }
