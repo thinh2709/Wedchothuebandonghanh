@@ -246,6 +246,7 @@ async function loadBookings() {
         const canCheckIn = item.status === 'ACCEPTED';
         const canCheckOut = item.status === 'IN_PROGRESS';
         const canRateUser = item.status === 'COMPLETED' && !item.companionRatingForUser;
+        const canChat = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS' || item.status === 'COMPLETED';
         tr.innerHTML = `
             <td>${item.id}</td>
             <td>${escapeHtml(item.customer?.fullName || item.customer?.username || '')}</td>
@@ -258,6 +259,7 @@ async function loadBookings() {
                 ${canCheckIn ? `<button class="btn btn-sm btn-outline-primary me-2" data-action="checkin">Check-in</button>` : ''}
                 ${canCheckOut ? `<button class="btn btn-sm btn-outline-success me-2" data-action="checkout">Check-out</button>` : ''}
                 ${canRateUser ? `<button class="btn btn-sm btn-outline-secondary me-2" data-action="rate">Rate User</button>` : ''}
+                ${canChat ? `<a class="btn btn-sm btn-outline-dark me-2" href="/user/chat.html?bookingId=${item.id}">Chat/Call</a>` : ''}
                 <button class="btn btn-sm btn-outline-danger" data-action="sos">SOS</button>
             </td>`;
         if (canProcess) {
@@ -417,53 +419,80 @@ async function bootstrap() {
             return;
         }
         document.getElementById('auth-user').textContent = `Xin chào, ${auth.username}`;
+        const page = document.body.dataset.page || 'companion-dashboard';
 
-        document.getElementById('profile-form').addEventListener('submit', async (e) => {
-            try {
-                await saveProfile(e);
-            } catch (err) {
-                showAlert(`Không thể cập nhật hồ sơ: ${err.message}`, 'danger');
-            }
-        });
-        document.getElementById('availability-form').addEventListener('submit', async (e) => {
-            try {
-                await addAvailability(e);
-            } catch (err) {
-                showAlert(`Không thể thêm lịch rảnh: ${err.message}`, 'danger');
-            }
-        });
-        document.getElementById('online-toggle').addEventListener('change', async () => {
-            try {
-                await updateOnlineStatus();
-            } catch (err) {
-                showAlert(`Không thể cập nhật online: ${err.message}`, 'danger');
-            }
-        });
-        document.getElementById('service-price-form').addEventListener('submit', async (e) => {
-            try {
-                await addServicePrice(e);
-            } catch (err) {
-                showAlert(`Không thể thêm bảng giá: ${err.message}`, 'danger');
-            }
-        });
-        document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
-            try {
-                await createWithdrawal(e);
-            } catch (err) {
-                showAlert(`Không thể rút tiền: ${err.message}`, 'danger');
-            }
-        });
+        const profileForm = document.getElementById('profile-form');
+        if (profileForm) {
+            profileForm.addEventListener('submit', async (e) => {
+                try {
+                    await saveProfile(e);
+                } catch (err) {
+                    showAlert(`Không thể cập nhật hồ sơ: ${err.message}`, 'danger');
+                }
+            });
+        }
 
-        await loadProfile();
-        await Promise.all([
-            loadAvailabilities(),
-            loadBookings(),
-            loadBookingWorkflow(),
-            loadConsultations(),
-            loadIncomeStats(),
-            loadServicePrices(),
-            loadWithdrawals()
-        ]);
+        const availabilityForm = document.getElementById('availability-form');
+        if (availabilityForm) {
+            availabilityForm.addEventListener('submit', async (e) => {
+                try {
+                    await addAvailability(e);
+                } catch (err) {
+                    showAlert(`Không thể thêm lịch rảnh: ${err.message}`, 'danger');
+                }
+            });
+        }
+
+        const onlineToggle = document.getElementById('online-toggle');
+        if (onlineToggle) {
+            onlineToggle.addEventListener('change', async () => {
+                try {
+                    await updateOnlineStatus();
+                } catch (err) {
+                    showAlert(`Không thể cập nhật online: ${err.message}`, 'danger');
+                }
+            });
+        }
+
+        const servicePriceForm = document.getElementById('service-price-form');
+        if (servicePriceForm) {
+            servicePriceForm.addEventListener('submit', async (e) => {
+                try {
+                    await addServicePrice(e);
+                } catch (err) {
+                    showAlert(`Không thể thêm bảng giá: ${err.message}`, 'danger');
+                }
+            });
+        }
+
+        const withdrawForm = document.getElementById('withdraw-form');
+        if (withdrawForm) {
+            withdrawForm.addEventListener('submit', async (e) => {
+                try {
+                    await createWithdrawal(e);
+                } catch (err) {
+                    showAlert(`Không thể rút tiền: ${err.message}`, 'danger');
+                }
+            });
+        }
+
+        const tasks = [];
+        if (page === 'companion-dashboard') {
+            tasks.push(loadBookingWorkflow(), loadIncomeStats());
+        }
+        if (page === 'companion-profile') {
+            tasks.push(loadProfile());
+        }
+        if (page === 'companion-operations') {
+            tasks.push(loadAvailabilities(), loadServicePrices());
+        }
+        if (page === 'companion-bookings') {
+            tasks.push(loadBookings(), loadBookingWorkflow(), loadConsultations());
+        }
+        if (page === 'companion-finance') {
+            tasks.push(loadIncomeStats(), loadWithdrawals());
+        }
+        await Promise.all(tasks);
     } catch (_) {
         window.location.href = '/user/login.html';
     }

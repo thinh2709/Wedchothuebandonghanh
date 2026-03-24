@@ -398,26 +398,113 @@ async function initReportPage(auth) {
 async function initChatPage(auth) {
     if (!requireLogin(auth)) return;
     const params = new URLSearchParams(window.location.search);
-    const bookingInput = document.getElementById("chat-booking-id");
-    if (params.get("bookingId")) bookingInput.value = params.get("bookingId");
-    let currentBookingId = Number(bookingInput.value || 0);
+    const bookingIdText = document.getElementById("chat-booking-id-text");
+    const threadTitle = document.getElementById("chat-thread-title");
+    const threadListBox = document.getElementById("chat-thread-list");
+    let currentBookingId = Number(params.get("bookingId") || 0);
+    let threads = [];
+
+    function normalizeThreads(list) {
+        return (Array.isArray(list) ? list : []).map((b) => {
+            const partner = b.customer?.username || b.companion?.user?.username || b.companion?.user?.fullName || "Đối phương";
+            return {
+                bookingId: Number(b.id || 0),
+                partnerName: partner,
+                status: b.status || "-",
+                bookingTime: b.bookingTime
+            };
+        }).filter((t) => t.bookingId > 0);
+    }
+
+    function renderThreadList() {
+        if (!threadListBox) return;
+        if (!threads.length) {
+            threadListBox.innerHTML = `<div class="p-3 text-muted">Chưa có cuộc trò chuyện nào.</div>`;
+            return;
+        }
+        threadListBox.innerHTML = threads.map((t) => {
+            const active = t.bookingId === currentBookingId ? "bg-light" : "";
+            return `<button type="button" class="list-group-item list-group-item-action border-0 border-bottom ${active} chat-thread-item" data-booking-id="${t.bookingId}">
+                <div class="fw-semibold">${escapeHtml(t.partnerName)}</div>
+                <div class="small text-muted">Booking #${t.bookingId} - ${escapeHtml(t.status)}</div>
+                <div class="small text-muted">${escapeHtml(formatDateTime(t.bookingTime))}</div>
+            </button>`;
+        }).join("");
+        threadListBox.querySelectorAll(".chat-thread-item").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                currentBookingId = Number(btn.getAttribute("data-booking-id"));
+                updateThreadHeader();
+                renderThreadList();
+                await loadMessages();
+            });
+        });
+    }
+
+    function updateThreadHeader() {
+        bookingIdText.textContent = currentBookingId ? String(currentBookingId) : "-";
+        const thread = threads.find((t) => t.bookingId === currentBookingId);
+        threadTitle.textContent = thread ? thread.partnerName : "Chưa chọn cuộc trò chuyện";
+    }
+
+    async function loadChatThreads() {
+        const results = [];
+        const myBookingsRes = await apiFetch("/api/bookings/me", { headers: {} });
+        if (myBookingsRes.ok) {
+            results.push(...normalizeThreads(await myBookingsRes.json()));
+        }
+        const companionBookingsRes = await apiFetch("/api/companions/me/bookings", { headers: {} });
+        if (companionBookingsRes.ok) {
+            results.push(...normalizeThreads(await companionBookingsRes.json()));
+        }
+        const uniq = new Map();
+        results.forEach((item) => {
+            if (!uniq.has(item.bookingId)) uniq.set(item.bookingId, item);
+        });
+        threads = [...uniq.values()].sort((a, b) => new Date(b.bookingTime || 0) - new Date(a.bookingTime || 0));
+    }
+
+    async function resolveBookingForChat() {
+        if (currentBookingId) return currentBookingId;
+
+        const pickPreferred = (list) => {
+            if (!Array.isArray(list) || !list.length) return 0;
+            const preferred = list.find((b) => ["IN_PROGRESS", "ACCEPTED", "COMPLETED"].includes(b.status));
+            return Number((preferred || list[0]).id || 0);
+        };
+
+        const myBookingsRes = await apiFetch("/api/bookings/me", { headers: {} });
+        if (myBookingsRes.ok) {
+            const myBookings = await myBookingsRes.json();
+            const picked = pickPreferred(myBookings);
+            if (picked) return picked;
+        }
+
+        const companionBookingsRes = await apiFetch("/api/companions/me/bookings", { headers: {} });
+        if (companionBookingsRes.ok) {
+            const companionBookings = await companionBookingsRes.json();
+            const picked = pickPreferred(companionBookings);
+            if (picked) return picked;
+        }
+
+        return 0;
+    }
 
     async function loadMessages() {
-        currentBookingId = Number(bookingInput.value || 0);
-        if (!currentBookingId) return;
+        const box = document.getElementById("chat-list");
+        if (!currentBookingId) {
+            box.innerHTML = `<div class="text-muted">Chưa có cuộc trò chuyện.</div>`;
+            return;
+        }
         const res = await apiFetch(`/api/chat/${currentBookingId}/messages`, { headers: {} });
         const list = res.ok ? await res.json() : [];
-        const box = document.getElementById("chat-list");
         box.innerHTML = list.map((m) => `<div class="mb-2"><strong>${escapeHtml(m.sender?.username || "user")}:</strong> ${escapeHtml(m.content)} <span class="text-muted small">(${escapeHtml(formatDateTime(m.createdAt))})</span></div>`).join("") || `<div class="text-muted">Chưa có tin nhắn.</div>`;
         box.scrollTop = box.scrollHeight;
     }
 
-    document.getElementById("load-chat-btn")?.addEventListener("click", loadMessages);
     document.getElementById("chat-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
-        currentBookingId = Number(bookingInput.value || 0);
         if (!currentBookingId) {
-            setMessage("chat-message", "warning", "Vui lòng nhập booking ID.");
+            setMessage("chat-message", "warning", "Không tìm thấy booking phù hợp để chat.");
             return;
         }
         const content = document.getElementById("chat-content").value.trim();
@@ -432,7 +519,6 @@ async function initChatPage(auth) {
         }
     });
     document.getElementById("call-btn")?.addEventListener("click", async () => {
-        currentBookingId = Number(bookingInput.value || 0);
         if (!currentBookingId) return;
         const res = await apiFetch(`/api/chat/${currentBookingId}/call`, { headers: {} });
         const box = document.getElementById("call-info");
@@ -444,8 +530,15 @@ async function initChatPage(auth) {
         }
     });
 
+    await loadChatThreads();
+    currentBookingId = await resolveBookingForChat();
+    updateThreadHeader();
+    renderThreadList();
+    if (!currentBookingId) {
+        setMessage("chat-message", "warning", "Chưa có booking để hiển thị chat.");
+    }
     await loadMessages();
-    setInterval(loadMessages, 5000);
+    setInterval(loadMessages, 3000);
 }
 
 async function refreshNotifications() {

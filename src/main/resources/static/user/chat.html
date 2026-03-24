@@ -17,19 +17,30 @@
 <main class="container py-4">
     <div class="card user-card">
         <div class="card-body">
-            <h1 class="h4 mb-3">Chat nội bộ theo booking</h1>
-            <div class="input-group mb-3">
-                <span class="input-group-text">Booking ID</span>
-                <input type="number" class="form-control" id="chat-booking-id" min="1">
-                <button id="load-chat-btn" class="btn btn-outline-primary">Tải chat</button>
-                <button id="call-btn" class="btn btn-outline-success">Lấy thông tin Call</button>
+            <h1 class="h4 mb-3">Tin nhắn</h1>
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="border rounded bg-white">
+                        <div class="p-3 border-bottom fw-semibold">Danh sách trò chuyện</div>
+                        <div id="chat-thread-list" style="max-height: 420px; overflow: auto;"></div>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div>
+                            <div class="fw-semibold" id="chat-thread-title">Chưa chọn cuộc trò chuyện</div>
+                            <div class="text-muted small">Booking ID: <span id="chat-booking-id-text">-</span></div>
+                        </div>
+                        <button id="call-btn" class="btn btn-outline-success btn-sm">Lấy thông tin Call</button>
+                    </div>
+                    <div id="call-info" class="mb-3"></div>
+                    <div id="chat-list" class="border rounded p-3 bg-white mb-3" style="height: 340px; overflow: auto;"></div>
+                    <form id="chat-form" class="input-group">
+                        <input id="chat-content" class="form-control" placeholder="Nhập tin nhắn...">
+                        <button class="btn btn-primary" type="submit">Gửi</button>
+                    </form>
+                </div>
             </div>
-            <div id="call-info" class="mb-3"></div>
-            <div id="chat-list" class="border rounded p-3 bg-white mb-3" style="height: 340px; overflow: auto;"></div>
-            <form id="chat-form" class="input-group">
-                <input id="chat-content" class="form-control" placeholder="Nhập tin nhắn...">
-                <button class="btn btn-primary" type="submit">Gửi</button>
-            </form>
             <div id="chat-message" class="mt-3"></div>
         </div>
     </div>

@@ -44,7 +44,7 @@ describe('COMPANION full flow: UI to API', () => {
 
   it('cập nhật profile, online, lịch rảnh, bảng giá, booking workflow, rút tiền', () => {
     loginCompanion();
-    cy.visit('/companion/dashboard.html');
+    cy.visit('/companion/profile.html');
 
     cy.intercept('PUT', '/api/companions/me/profile').as('updateProfileApi');
     cy.intercept('PUT', '/api/companions/me/identity').as('updateIdentityApi');
@@ -68,6 +68,7 @@ describe('COMPANION full flow: UI to API', () => {
     cy.wait('@onlineApi').its('response.statusCode').should('eq', 200);
 
     cy.intercept('POST', '/api/companions/me/availabilities').as('addAvailabilityApi');
+    cy.visit('/companion/operations.html');
     cy.get('#start-time').clear().type('2026-03-31T09:00');
     cy.get('#end-time').clear().type('2026-03-31T11:00');
     cy.get('#note').clear().type('slot from cypress');
@@ -84,7 +85,7 @@ describe('COMPANION full flow: UI to API', () => {
     cy.get('#service-price-body').should('contain.text', 'Test service');
 
     cy.intercept('GET', '/api/companions/me/bookings/workflow').as('workflowApi');
-    cy.reload();
+    cy.visit('/companion/bookings.html');
     cy.wait('@workflowApi').its('response.statusCode').should('eq', 200);
     cy.get('#wf-pending').should('exist');
     cy.get('#wf-upcoming').should('exist');
@@ -92,6 +93,7 @@ describe('COMPANION full flow: UI to API', () => {
     cy.get('#wf-done').should('exist');
 
     cy.intercept('POST', '/api/companions/me/withdrawals').as('withdrawApi');
+    cy.visit('/companion/finance.html');
     cy.get('#withdraw-amount').clear().type('1');
     cy.get('#bank-name').clear().type('VCB');
     cy.get('#bank-account-number').clear().type('123456789');

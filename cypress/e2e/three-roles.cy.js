@@ -143,9 +143,9 @@ describe('Nghiệp vụ E2E cho 3 vai trò', () => {
     login(companion);
     cy.url().should('include', '/companion/dashboard.html');
 
-    cy.visit('/companion/dashboard.html');
+    cy.visit('/companion/bookings.html');
     cy.contains('#booking-body tr', customer.username, { timeout: 15000 }).within(() => {
-      cy.contains('button', 'Nhan').click();
+      cy.contains('button', 'Nhận').click();
     });
     cy.get('#alert-box').should('contain.text', 'ACCEPTED');
     cy.get('#wf-upcoming').invoke('text').then((value) => {
@@ -178,6 +178,7 @@ describe('Nghiệp vụ E2E cho 3 vai trò', () => {
     });
     cy.get('#alert-box').invoke('text').should('contain', 'Đã đánh giá user');
 
+    cy.visit('/companion/finance.html');
     cy.get('#withdraw-amount').clear().type('1');
     cy.get('#bank-name').clear().type('VCB');
     cy.get('#bank-account-number').clear().type('123456789');
