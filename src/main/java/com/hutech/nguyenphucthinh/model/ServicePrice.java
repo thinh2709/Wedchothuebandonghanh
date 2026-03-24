@@ -18,6 +18,10 @@ public class ServicePrice {
     @Column(nullable = false)
     private String serviceName;
 
+    @ManyToOne
+    @JoinColumn(name = "companion_id", nullable = false)
+    private Companion companion;
+
     @Column(nullable = false)
     private BigDecimal pricePerHour;
 

@@ -42,6 +42,30 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
 
+    private LocalDateTime acceptedAt;
+
+    private LocalDateTime startedAt;
+
+    private LocalDateTime completedAt;
+
+    private Double checkInLatitude;
+
+    private Double checkInLongitude;
+
+    private Double checkOutLatitude;
+
+    private Double checkOutLongitude;
+
+    private Boolean sosTriggered = false;
+
+    @Column(columnDefinition = "TEXT")
+    private String sosNote;
+
+    private Integer companionRatingForUser;
+
+    @Column(columnDefinition = "TEXT")
+    private String companionReviewForUser;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public enum Status {

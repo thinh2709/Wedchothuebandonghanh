@@ -2,6 +2,7 @@ package com.hutech.nguyenphucthinh.controller.user;
 
 import com.hutech.nguyenphucthinh.model.User;
 import com.hutech.nguyenphucthinh.service.user.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpSession;
@@ -66,5 +67,12 @@ public class UserController {
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         return response;
+    }
+
+    private String redirectWithQuery(String path, String query) {
+        if (query == null || query.isBlank()) {
+            return "redirect:" + path;
+        }
+        return "redirect:" + path + "?" + query;
     }
 }
