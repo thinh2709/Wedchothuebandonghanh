@@ -830,8 +830,35 @@ function setupPageEvents() {
 async function bootstrapAdminPage() {
     bindLogout();
     setupPageEvents();
+    let me = null;
+    try {
+        me = await requestJson("/api/auth/me");
+    } catch (_) {
+        me = null;
+    }
     await pollAdminRealtimeNotifications();
-    if (!adminRealtimeNotifState.timer) {
+    if (me?.userId && window.RealtimeStomp) {
+        try {
+            await RealtimeStomp.ensureLibs();
+            await RealtimeStomp.connect();
+            await RealtimeStomp.subscribeNotifications(Number(me.userId), (n) => {
+                const id = Number(n.id);
+                if (!adminRealtimeNotifState.seenIds.has(id)) {
+                    adminRealtimeNotifState.seenIds.add(id);
+                    if (isSosNotification(n)) {
+                        showAdminSosAlarm(n);
+                    } else {
+                        showAdminToast(n);
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn("WebSocket thông báo admin không khả dụng, dùng polling", e);
+            if (!adminRealtimeNotifState.timer) {
+                adminRealtimeNotifState.timer = setInterval(pollAdminRealtimeNotifications, 4000);
+            }
+        }
+    } else if (!adminRealtimeNotifState.timer) {
         adminRealtimeNotifState.timer = setInterval(pollAdminRealtimeNotifications, 4000);
     }
 

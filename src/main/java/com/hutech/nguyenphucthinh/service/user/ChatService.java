@@ -3,6 +3,7 @@ package com.hutech.nguyenphucthinh.service.user;
 import com.hutech.nguyenphucthinh.model.Booking;
 import com.hutech.nguyenphucthinh.model.ChatMessage;
 import com.hutech.nguyenphucthinh.model.User;
+import com.hutech.nguyenphucthinh.realtime.RealtimeBroadcastService;
 import com.hutech.nguyenphucthinh.repository.BookingRepository;
 import com.hutech.nguyenphucthinh.repository.ChatMessageRepository;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
@@ -22,6 +23,17 @@ public class ChatService {
     private ChatMessageRepository chatMessageRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private RealtimeBroadcastService realtimeBroadcastService;
+
+    public boolean canAccessBookingChat(Long userId, Long bookingId) {
+        try {
+            getAuthorizedBooking(userId, bookingId);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
 
     private Booking getAuthorizedBooking(Long userId, Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
@@ -49,7 +61,9 @@ public class ChatService {
         msg.setSender(sender);
         msg.setContent(content.trim());
         msg.setCreatedAt(LocalDateTime.now());
-        return chatMessageRepository.save(msg);
+        ChatMessage saved = chatMessageRepository.save(msg);
+        realtimeBroadcastService.publishChatMessage(saved);
+        return saved;
     }
 
     public Map<String, Object> generateCallInfo(Long userId, Long bookingId) {

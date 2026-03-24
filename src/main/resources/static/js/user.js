@@ -585,6 +585,7 @@ async function initChatPage(auth) {
                 updateThreadHeader();
                 renderThreadList();
                 await loadMessages();
+                await resubscribeChatSocket();
             });
         });
     }
@@ -687,7 +688,20 @@ async function initChatPage(auth) {
         setMessage("chat-message", "warning", "Chưa có booking để hiển thị chat.");
     }
     await loadMessages();
-    setInterval(loadMessages, 3000);
+    if (window.RealtimeStomp) {
+        try {
+            await RealtimeStomp.ensureLibs();
+            await resubscribeChatSocket();
+            if (!chatStompSub) {
+                chatPollTimer = setInterval(loadMessages, 3000);
+            }
+        } catch (e) {
+            console.warn("Chat realtime lỗi, dùng polling", e);
+            chatPollTimer = setInterval(loadMessages, 3000);
+        }
+    } else {
+        chatPollTimer = setInterval(loadMessages, 3000);
+    }
 }
 
 async function refreshNotifications() {
@@ -919,7 +933,25 @@ async function bootstrap() {
     renderTopNav(auth);
     if (auth.authenticated) {
         await refreshNotifications();
-        setInterval(refreshNotifications, 5000);
+        if (auth.userId && window.RealtimeStomp) {
+            try {
+                await RealtimeStomp.ensureLibs();
+                await RealtimeStomp.connect();
+                await RealtimeStomp.subscribeNotifications(Number(auth.userId), (n) => {
+                    const id = Number(n.id);
+                    if (!userRealtimeNotifState.seenIds.has(id)) {
+                        userRealtimeNotifState.seenIds.add(id);
+                        showUserNotificationToast(n);
+                    }
+                    refreshNotifications();
+                });
+            } catch (e) {
+                console.warn("WebSocket thông báo không khả dụng, dùng polling", e);
+                setInterval(refreshNotifications, 5000);
+            }
+        } else {
+            setInterval(refreshNotifications, 5000);
+        }
     }
     if (page === "login" || page === "register") {
         initAuthPages();

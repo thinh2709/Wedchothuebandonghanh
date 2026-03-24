@@ -41,7 +41,7 @@ describe('COMPANION full flow: UI to API', () => {
     cy.request('POST', '/api/user/logout');
   });
 
-  it('cập nhật profile, online, lịch rảnh, bảng giá, workflow, bank-account, rút tiền', () => {
+  it('cập nhật profile, online, trang lịch (tự động), bảng giá, workflow, bank-account, rút tiền', () => {
     loginCompanion();
     cy.visit('/companion/profile.html');
 
@@ -67,14 +67,13 @@ describe('COMPANION full flow: UI to API', () => {
     cy.wait('@onlineApi').its('response.statusCode').should('eq', 200);
     cy.request('/api/companions/me/profile').its('body.onlineStatus').should('eq', true);
 
-    cy.intercept('POST', '/api/companions/me/availabilities').as('addAvailabilityApi');
+    cy.intercept('GET', '/api/companions/me/profile').as('opsProfileApi');
+    cy.intercept('GET', '/api/companions/me/bookings').as('opsBookingsApi');
     cy.visit('/companion/operations.html');
-    cy.get('#start-time').clear().type('2026-03-31T09:00');
-    cy.get('#end-time').clear().type('2026-03-31T11:00');
-    cy.get('#note').clear().type('slot from cypress');
-    cy.get('#availability-form').submit();
-    cy.wait('@addAvailabilityApi').its('response.statusCode').should('eq', 200);
-    cy.get('#availability-body').should('contain.text', 'slot from cypress');
+    cy.wait('@opsProfileApi').its('response.statusCode').should('eq', 200);
+    cy.wait('@opsBookingsApi').its('response.statusCode').should('eq', 200);
+    cy.get('#availability-mode-hint').invoke('text').should('match', /online|ONLINE|rảnh toàn bộ/i);
+    cy.get('#availability-body').should('contain.text', 'Hiện chưa có khung giờ bận nào');
 
     cy.intercept('POST', '/api/companions/me/service-prices').as('addServiceApi');
     cy.get('#service-name').clear().type('Test service');

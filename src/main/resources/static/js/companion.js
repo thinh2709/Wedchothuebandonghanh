@@ -666,7 +666,25 @@ async function bootstrap() {
             authUserEl.textContent = `Xin chào, ${auth.username}`;
         }
         await pollCompanionRealtimeNotifications();
-        if (!companionRealtimeNotifState.timer) {
+        if (auth.userId && window.RealtimeStomp) {
+            try {
+                await RealtimeStomp.ensureLibs();
+                await RealtimeStomp.connect();
+                await RealtimeStomp.subscribeNotifications(Number(auth.userId), (n) => {
+                    const id = Number(n.id);
+                    if (!companionRealtimeNotifState.seenIds.has(id)) {
+                        companionRealtimeNotifState.seenIds.add(id);
+                        showCompanionNotificationToast(n);
+                    }
+                    pollCompanionRealtimeNotifications();
+                });
+            } catch (e) {
+                console.warn('WebSocket thông báo không khả dụng, dùng polling', e);
+                if (!companionRealtimeNotifState.timer) {
+                    companionRealtimeNotifState.timer = setInterval(pollCompanionRealtimeNotifications, 4000);
+                }
+            }
+        } else if (!companionRealtimeNotifState.timer) {
             companionRealtimeNotifState.timer = setInterval(pollCompanionRealtimeNotifications, 4000);
         }
         const page = document.body.dataset.page || 'companion-dashboard';
@@ -909,6 +927,24 @@ async function initCompanionChatPage() {
     const threadListBox = document.getElementById('chat-thread-list');
     let currentBookingId = Number(new URLSearchParams(window.location.search).get('bookingId') || 0);
     let threads = [];
+    let chatStompSub = null;
+    let chatPollTimer = null;
+
+    async function resubscribeChatSocket() {
+        if (chatStompSub && typeof chatStompSub.unsubscribe === 'function') {
+            try { chatStompSub.unsubscribe(); } catch (_) {}
+            chatStompSub = null;
+        }
+        if (!currentBookingId || !window.RealtimeStomp) return;
+        try {
+            await RealtimeStomp.connect();
+            chatStompSub = await RealtimeStomp.subscribeChat(currentBookingId, () => {
+                loadMessages();
+            });
+        } catch (e) {
+            console.warn('WebSocket chat không khả dụng', e);
+        }
+    }
 
     function updateThreadHeader() {
         if (!bookingIdText || !threadTitle) return;
@@ -1033,7 +1069,20 @@ async function initCompanionChatPage() {
     updateThreadHeader();
     renderThreadList();
     await loadMessages();
-    setInterval(loadMessages, 3000);
+    if (window.RealtimeStomp) {
+        try {
+            await RealtimeStomp.ensureLibs();
+            await resubscribeChatSocket();
+            if (!chatStompSub) {
+                chatPollTimer = setInterval(loadMessages, 3000);
+            }
+        } catch (e) {
+            console.warn('Chat realtime lỗi, dùng polling', e);
+            chatPollTimer = setInterval(loadMessages, 3000);
+        }
+    } else {
+        chatPollTimer = setInterval(loadMessages, 3000);
+    }
 }
 
 document.getElementById('logout-btn').addEventListener('click', async (e) => {

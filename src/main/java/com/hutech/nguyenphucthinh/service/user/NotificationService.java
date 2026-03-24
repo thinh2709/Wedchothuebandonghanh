@@ -2,6 +2,7 @@ package com.hutech.nguyenphucthinh.service.user;
 
 import com.hutech.nguyenphucthinh.model.Notification;
 import com.hutech.nguyenphucthinh.model.User;
+import com.hutech.nguyenphucthinh.realtime.RealtimeBroadcastService;
 import com.hutech.nguyenphucthinh.repository.NotificationRepository;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,8 @@ public class NotificationService {
     private NotificationRepository notificationRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private RealtimeBroadcastService realtimeBroadcastService;
 
     public Notification create(Long userId, String title, String content) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
@@ -23,7 +26,9 @@ public class NotificationService {
         notification.setTitle(title);
         notification.setContent(content);
         notification.setIsRead(false);
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+        realtimeBroadcastService.publishNotification(saved);
+        return saved;
     }
 
     public List<Notification> getMyNotifications(Long userId) {
