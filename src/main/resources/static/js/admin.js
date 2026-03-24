@@ -1,5 +1,9 @@
 async function requestJson(url, options = {}) {
     const response = await fetch(url, options);
+    if (response.status === 401 || response.status === 403) {
+        window.location.href = "/user/login.html";
+        throw new Error("Unauthorized");
+    }
     if (!response.ok) {
         throw new Error(await response.text());
     }
@@ -11,13 +15,51 @@ function showAlert(message, type = "success") {
     if (!box) {
         return;
     }
-    box.innerHTML = `<div class="alert alert-${type} mb-0" data-cy="admin-alert-message">${message}</div>`;
+    box.innerHTML = `<div class="alert alert-${type} mb-0">${message}</div>`;
 }
 
 function clearAlert() {
     const box = document.getElementById("admin-alert");
     if (box) {
         box.innerHTML = "";
+    }
+}
+
+function readAuthEvidence() {
+    const localRole = localStorage.getItem("role");
+    const sessionRole = sessionStorage.getItem("role");
+    const localUserId = localStorage.getItem("userId") || localStorage.getItem("user_id");
+    const sessionUserId = sessionStorage.getItem("userId") || sessionStorage.getItem("user_id");
+    const localToken = localStorage.getItem("token") || localStorage.getItem("jwt");
+    const sessionToken = sessionStorage.getItem("token") || sessionStorage.getItem("jwt");
+    const hasSessionCookie = document.cookie.includes("JSESSIONID=");
+
+    return {
+        role: sessionRole || localRole,
+        hasUserId: Boolean(localUserId || sessionUserId),
+        hasToken: Boolean(localToken || sessionToken),
+        hasSessionCookie
+    };
+}
+
+async function ensureAdminAccess() {
+    const auth = readAuthEvidence();
+    const hasAnyAuthSignal = auth.hasSessionCookie || auth.hasUserId || auth.hasToken || auth.role === "ADMIN";
+    if (!hasAnyAuthSignal) {
+        window.location.href = "/user/login.html";
+        return false;
+    }
+
+    try {
+        const me = await requestJson("/api/auth/me", { method: "GET" });
+        if (!me?.authenticated || me.role !== "ADMIN") {
+            window.location.href = "/user/login.html";
+            return false;
+        }
+        return true;
+    } catch (_) {
+        window.location.href = "/user/login.html";
+        return false;
     }
 }
 
@@ -41,7 +83,7 @@ function bindLogout() {
         return;
     }
     logoutBtn.addEventListener("click", async () => {
-        await fetch("/api/user/logout", { method: "POST" });
+        await fetch("/logout", { method: "POST" });
         window.location.href = "/user/index.html";
     });
 }
@@ -73,13 +115,13 @@ async function loadPendingCompanions(tableBodyId) {
     data.forEach((item) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td data-cy="pending-id">${item.id}</td>
-            <td data-cy="pending-username">${escapeHtml(item.user?.username || "")}</td>
-            <td data-cy="pending-bio">${escapeHtml(item.bio || "")}</td>
-            <td><span class="badge text-bg-warning" data-cy="pending-status">${escapeHtml(item.status || "PENDING")}</span></td>
+            <td>${item.id}</td>
+            <td>${escapeHtml(item.user?.username || "")}</td>
+            <td>${escapeHtml(item.bio || "")}</td>
+            <td><span class="badge text-bg-warning">${escapeHtml(item.status || "PENDING")}</span></td>
             <td>
-                <button class="btn btn-sm btn-success me-1" data-cy="pending-approve-btn" data-action="approve" data-id="${item.id}">Cap tich xanh</button>
-                <button class="btn btn-sm btn-danger" data-cy="pending-reject-btn" data-action="reject" data-id="${item.id}">Từ chối</button>
+                <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Cấp tích xanh</button>
+                <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Từ chối</button>
             </td>
         `;
         rows.appendChild(tr);
@@ -113,14 +155,14 @@ async function loadUsersPage() {
     data.users.forEach((user) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td data-cy="user-id">${user.id}</td>
-            <td data-cy="user-username">${escapeHtml(user.username)}</td>
-            <td data-cy="user-email">${escapeHtml(user.email)}</td>
-            <td data-cy="user-role">${escapeHtml(user.role)}</td>
-            <td><span class="badge ${user.flag === "BANNED" ? "text-bg-danger" : user.flag === "WARNED" ? "text-bg-warning" : "text-bg-secondary"}" data-cy="user-flag">${escapeHtml(user.flag === "BANNED" ? "Đã khóa" : user.flag === "WARNED" ? "Đã cảnh cáo" : "Bình thường")}</span></td>
+            <td>${user.id}</td>
+            <td>${escapeHtml(user.username)}</td>
+            <td>${escapeHtml(user.email)}</td>
+            <td>${escapeHtml(user.role)}</td>
+            <td><span class="badge ${user.flag === "BANNED" ? "text-bg-danger" : user.flag === "WARNED" ? "text-bg-warning" : "text-bg-secondary"}">${escapeHtml(user.flag === "BANNED" ? "Đã khóa" : user.flag === "WARNED" ? "Đã cảnh cáo" : "Bình thường")}</span></td>
             <td>
-                <button class="btn btn-sm btn-warning me-1" data-cy="warn-user-btn" data-action="warn" data-id="${user.id}">Cảnh cáo</button>
-                <button class="btn btn-sm btn-danger" data-cy="ban-user-btn" data-action="ban" data-id="${user.id}">Khóa</button>
+                <button class="btn btn-sm btn-warning me-1" data-action="warn" data-id="${user.id}">Cảnh cáo</button>
+                <button class="btn btn-sm btn-danger" data-action="ban" data-id="${user.id}">Khóa</button>
             </td>
         `;
         usersBody.appendChild(tr);
@@ -129,11 +171,11 @@ async function loadUsersPage() {
     data.companions.forEach((companion) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td data-cy="companion-id">${companion.id}</td>
-            <td data-cy="companion-username">${escapeHtml(companion.username)}</td>
-            <td data-cy="companion-status">${escapeHtml(companion.status)}</td>
-            <td data-cy="companion-flag">${escapeHtml(companion.flag)}</td>
-            <td data-cy="companion-bio">${escapeHtml(companion.bio || "")}</td>
+            <td>${companion.id}</td>
+            <td>${escapeHtml(companion.username)}</td>
+            <td>${escapeHtml(companion.status)}</td>
+            <td>${escapeHtml(companion.flag)}</td>
+            <td>${escapeHtml(companion.bio || "")}</td>
         `;
         companionsBody.appendChild(tr);
     });
@@ -167,13 +209,13 @@ async function loadModerationPage() {
     reviews.forEach((review) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td data-cy="review-id">${review.id}</td>
-            <td data-cy="review-booking-id">${review.bookingId || ""}</td>
-            <td data-cy="review-rating">${review.rating || ""}</td>
-            <td data-cy="review-comment">${escapeHtml(review.comment || "")}</td>
-            <td><span class="badge ${review.hidden ? "text-bg-danger" : "text-bg-success"}" data-cy="review-status">${review.hidden ? "Đã ẩn" : "Hiển thị"}</span></td>
+            <td>${review.id}</td>
+            <td>${review.bookingId || ""}</td>
+            <td>${review.rating || ""}</td>
+            <td>${escapeHtml(review.comment || "")}</td>
+            <td><span class="badge ${review.hidden ? "text-bg-danger" : "text-bg-success"}">${review.hidden ? "Đã ẩn" : "Hiển thị"}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-danger" data-cy="hide-review-btn" ${review.hidden ? "disabled" : ""} data-id="${review.id}">Ẩn bình luận</button>
+                <button class="btn btn-sm btn-outline-danger" ${review.hidden ? "disabled" : ""} data-id="${review.id}">Ẩn bình luận</button>
             </td>
         `;
         reviewsBody.appendChild(tr);
@@ -207,23 +249,14 @@ async function loadTransactionsPage() {
     data.pendingWithdrawals.forEach((item) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-<<<<<<< Updated upstream
             <td>${item.id}</td>
             <td>${escapeHtml(item.companionName || "")}</td>
             <td>${item.bookingId || ""}</td>
             <td>${formatMoney(item.amount)}</td>
             <td><span class="badge text-bg-warning">${escapeHtml(item.status)}</span></td>
-=======
-            <td data-cy="withdrawal-id">${item.id}</td>
-            <td data-cy="withdrawal-companion">${escapeHtml(item.companionName || "")}</td>
-            <td data-cy="withdrawal-bank">${escapeHtml(item.bankName || "")}</td>
-            <td data-cy="withdrawal-account">${escapeHtml(item.bankAccountNumber || "")}</td>
-            <td data-cy="withdrawal-amount">${formatMoney(item.amount)}</td>
-            <td><span class="badge text-bg-warning" data-cy="withdrawal-status">${escapeHtml(item.status)}</span></td>
->>>>>>> Stashed changes
             <td>
-                <button class="btn btn-sm btn-success me-1" data-cy="approve-withdrawal-btn" data-action="approve" data-id="${item.id}">Duyệt</button>
-                <button class="btn btn-sm btn-danger" data-cy="reject-withdrawal-btn" data-action="reject" data-id="${item.id}">Từ chối</button>
+                <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Duyệt</button>
+                <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Từ chối</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -242,11 +275,7 @@ async function reviewWithdrawal(id, approve) {
         ? `/api/admin/transactions/withdrawals/${id}/approve`
         : `/api/admin/transactions/withdrawals/${id}/reject`;
     await requestJson(url, { method: "POST" });
-    showAlert(
-        approve
-            ? "Đã duyệt lệnh rút tiền (da duyet lenh rut tien)."
-            : "Đã từ chối lệnh rút tiền (da tu choi lenh rut tien)."
-    );
+    showAlert(approve ? "Đã duyệt lệnh rút tiền." : "Đã từ chối lệnh rút tiền.");
     await loadTransactionsPage();
 }
 
@@ -258,7 +287,7 @@ async function saveCommissionRate(event) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commissionRate: value })
     });
-    showAlert("Đã cập nhật commission rate (tỷ lệ hoa hồng).");
+    showAlert("Đã cập nhật tỷ lệ hoa hồng.");
     await loadTransactionsPage();
 }
 
@@ -274,16 +303,16 @@ async function loadDisputesPage() {
     disputes.forEach((dispute) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td data-cy="dispute-id">${dispute.id}</td>
-            <td data-cy="dispute-reporter">${escapeHtml(dispute.reporter || "")}</td>
-            <td data-cy="dispute-reported-user">${escapeHtml(dispute.reportedUser || "")}</td>
-            <td data-cy="dispute-reason">${escapeHtml(dispute.reason || "")}</td>
-            <td><span class="badge ${dispute.status === "RESOLVED" ? "text-bg-success" : "text-bg-warning"}" data-cy="dispute-status">${escapeHtml(dispute.status)}</span></td>
+            <td>${dispute.id}</td>
+            <td>${escapeHtml(dispute.reporter || "")}</td>
+            <td>${escapeHtml(dispute.reportedUser || "")}</td>
+            <td>${escapeHtml(dispute.reason || "")}</td>
+            <td><span class="badge ${dispute.status === "RESOLVED" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(dispute.status)}</span></td>
             <td class="action-group">
-                <button class="btn btn-sm btn-secondary" data-cy="freeze-dispute-btn" data-action="freeze" data-id="${dispute.id}">Đóng băng ký quỹ</button>
-                <button class="btn btn-sm btn-outline-primary" data-cy="refund-dispute-btn" data-action="refund" data-id="${dispute.id}">Hoàn tiền</button>
-                <button class="btn btn-sm btn-outline-success" data-cy="payout-dispute-btn" data-action="payout" data-id="${dispute.id}">Thanh toán</button>
-                <button class="btn btn-sm btn-dark" data-cy="close-dispute-btn" data-action="close" data-id="${dispute.id}">Đóng hồ sơ</button>
+                <button class="btn btn-sm btn-secondary" data-action="freeze" data-id="${dispute.id}">Đóng băng ký quỹ</button>
+                <button class="btn btn-sm btn-outline-primary" data-action="refund" data-id="${dispute.id}">Hoàn tiền</button>
+                <button class="btn btn-sm btn-outline-success" data-action="payout" data-id="${dispute.id}">Thanh toán</button>
+                <button class="btn btn-sm btn-dark" data-action="close" data-id="${dispute.id}">Đóng hồ sơ</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -362,7 +391,12 @@ async function bootstrapAdminPage() {
     }
 }
 
-bootstrapAdminPage().catch((error) => {
-    console.error(error);
-    showAlert("Không thể tải dữ liệu admin. Vui lòng thử lại.", "danger");
+ensureAdminAccess().then((allowed) => {
+    if (!allowed) {
+        return;
+    }
+    bootstrapAdminPage().catch((error) => {
+        console.error(error);
+        showAlert("Không thể tải dữ liệu admin. Vui lòng thử lại.", "danger");
+    });
 });
