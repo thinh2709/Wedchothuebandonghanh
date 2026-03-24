@@ -4,12 +4,15 @@ import com.hutech.nguyenphucthinh.model.Booking;
 import com.hutech.nguyenphucthinh.model.Companion;
 import com.hutech.nguyenphucthinh.model.CompanionAvailability;
 import com.hutech.nguyenphucthinh.model.Consultation;
+import com.hutech.nguyenphucthinh.model.ServicePrice;
+import com.hutech.nguyenphucthinh.model.Withdrawal;
 import com.hutech.nguyenphucthinh.service.companion.CompanionService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +38,7 @@ public class CompanionController {
     public Companion registerCompanion(@RequestBody Map<String, String> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         if (userId == null) {
-            throw new RuntimeException("Please login first");
+            throw new RuntimeException("Vui lòng đăng nhập trước");
         }
         Companion companion = companionService.registerCompanion(
                 userId,
@@ -70,6 +73,42 @@ public class CompanionController {
                 request.getOrDefault("appearance", ""),
                 request.getOrDefault("availability", "")
         );
+    }
+
+    @PutMapping("/me/identity")
+    public Companion updateIdentity(@RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.updateIdentity(
+                userId,
+                request.getOrDefault("identityNumber", ""),
+                request.getOrDefault("identityImageUrl", ""),
+                request.getOrDefault("portraitImageUrl", "")
+        );
+    }
+
+    @PutMapping("/me/media-skills")
+    public Companion updateMediaAndSkills(@RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.updateMediaAndSkills(
+                userId,
+                request.getOrDefault("introMediaUrls", ""),
+                request.getOrDefault("skills", "")
+        );
+    }
+
+    @PatchMapping("/me/online")
+    public Companion setOnlineStatus(@RequestBody Map<String, Boolean> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.setOnlineStatus(userId, Boolean.TRUE.equals(request.get("online")));
     }
 
     @GetMapping("/me/availabilities")
@@ -122,6 +161,72 @@ public class CompanionController {
         return companionService.updateBookingStatus(userId, bookingId, Booking.Status.valueOf(request.get("status")));
     }
 
+    @GetMapping("/me/bookings/workflow")
+    public Map<String, List<Booking>> getBookingWorkflow(HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.getBookingWorkflow(userId);
+    }
+
+    @PostMapping("/me/bookings/{bookingId}/checkin")
+    public Booking checkIn(@PathVariable Long bookingId, @RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.checkIn(
+                userId,
+                bookingId,
+                request.get("lat") == null ? null : Double.valueOf(request.get("lat")),
+                request.get("lng") == null ? null : Double.valueOf(request.get("lng"))
+        );
+    }
+
+    @PostMapping("/me/bookings/{bookingId}/checkout")
+    public Booking checkOut(@PathVariable Long bookingId, @RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.checkOut(
+                userId,
+                bookingId,
+                request.get("lat") == null ? null : Double.valueOf(request.get("lat")),
+                request.get("lng") == null ? null : Double.valueOf(request.get("lng"))
+        );
+    }
+
+    @PostMapping("/me/bookings/{bookingId}/sos")
+    public Booking triggerSos(@PathVariable Long bookingId, @RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.triggerSos(
+                userId,
+                bookingId,
+                request.getOrDefault("note", ""),
+                request.get("lat") == null ? null : Double.valueOf(request.get("lat")),
+                request.get("lng") == null ? null : Double.valueOf(request.get("lng"))
+        );
+    }
+
+    @PostMapping("/me/bookings/{bookingId}/rate-user")
+    public Booking rateUser(@PathVariable Long bookingId, @RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.rateUser(
+                userId,
+                bookingId,
+                request.get("rating") == null ? null : Integer.valueOf(request.get("rating")),
+                request.getOrDefault("review", "")
+        );
+    }
+
     @GetMapping("/me/income-stats")
     public Map<String, Object> getMyIncomeStats(HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
@@ -129,6 +234,62 @@ public class CompanionController {
             throw new RuntimeException("Please login first");
         }
         return companionService.getIncomeStats(userId);
+    }
+
+    @GetMapping("/me/service-prices")
+    public List<ServicePrice> getMyServicePrices(HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.getServicePrices(userId);
+    }
+
+    @PostMapping("/me/service-prices")
+    public ServicePrice addServicePrice(@RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.addServicePrice(
+                userId,
+                request.getOrDefault("serviceName", ""),
+                request.get("pricePerHour") == null ? null : new BigDecimal(request.get("pricePerHour")),
+                request.getOrDefault("description", "")
+        );
+    }
+
+    @DeleteMapping("/me/service-prices/{priceId}")
+    public void deleteServicePrice(@PathVariable Long priceId, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        companionService.deleteServicePrice(userId, priceId);
+    }
+
+    @GetMapping("/me/withdrawals")
+    public List<Withdrawal> getMyWithdrawals(HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.getWithdrawals(userId);
+    }
+
+    @PostMapping("/me/withdrawals")
+    public Withdrawal createWithdrawal(@RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.createWithdrawal(
+                userId,
+                request.get("amount") == null ? null : new BigDecimal(request.get("amount")),
+                request.getOrDefault("bankName", ""),
+                request.getOrDefault("bankAccountNumber", ""),
+                request.getOrDefault("accountHolderName", "")
+        );
     }
 
     @GetMapping("/me/consultations")

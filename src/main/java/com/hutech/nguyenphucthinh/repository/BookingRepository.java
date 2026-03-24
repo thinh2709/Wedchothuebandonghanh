@@ -7,5 +7,6 @@ import java.util.List;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByCustomerIdOrderByBookingTimeDesc(Long customerId);
     List<Booking> findByCompanionIdOrderByBookingTimeDesc(Long companionId);
+    List<Booking> findByCompanionIdAndStatusOrderByBookingTimeDesc(Long companionId, Booking.Status status);
     long countByCompanionIdAndStatus(Long companionId, Booking.Status status);
 }

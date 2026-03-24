@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lich hen - User</title>
+    <title>Lịch hẹn - User</title>
     <link rel="stylesheet" href="/css/user.css">
 </head>
 <body>
     <div class="container">
-        <h1>Lich hen cua ban</h1>
-        <div id="booking-list"><p>Dang tai danh sach lich hen...</p></div>
+        <h1>Lịch hẹn của bạn</h1>
+        <div id="booking-list"><p>Đang tải danh sách lịch hẹn...</p></div>
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -19,7 +19,7 @@
                 .then(bookings => {
                     bookingList.innerHTML = '';
                     if (!bookings.length) {
-                        bookingList.innerHTML = '<p>Ban chua co lich hen nao.</p>';
+                        bookingList.innerHTML = '<p>Bạn chưa có lịch hẹn nào.</p>';
                         return;
                     }
                     bookings.forEach(booking => {

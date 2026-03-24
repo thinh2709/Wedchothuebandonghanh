@@ -3,35 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dang nhap User</title>
+    <title>Đăng nhập User</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/css/user.css">
 </head>
-<body>
-    <h1>Dang nhap</h1>
-    <p id="auth-message" style="max-width: 400px; margin: 0 auto 1rem; text-align: center; font-weight: bold;"></p>
-    <form action="/login" method="post">
-        <div>
-            <label for="username">Ten nguoi dung:</label>
-            <input type="text" id="username" name="username" required>
+<body class="bg-light">
+    <main class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-7 col-lg-5">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <h1 class="h4 text-center mb-3">Đăng nhập</h1>
+                        <div id="auth-message" class="alert d-none" role="alert"></div>
+                        <form id="login-form" action="/login" method="post" novalidate>
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Tên người dùng</label>
+                                <input type="text" id="username" name="username" class="form-control" required minlength="4" maxlength="30">
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Mật khẩu</label>
+                                <input type="password" id="password" name="password" class="form-control" required minlength="6">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Đăng nhập</button>
+                        </form>
+                        <p class="text-center text-muted small mt-3 mb-0">
+                            Chưa có tài khoản? <a href="/register">Đăng ký</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div>
-            <label for="password">Mat khau:</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        <button type="submit">Dang nhap</button>
-    </form>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const params = new URLSearchParams(window.location.search);
         const messageEl = document.getElementById('auth-message');
+        const loginForm = document.getElementById('login-form');
         if (messageEl) {
             if (params.get('registered') === '1') {
-                messageEl.textContent = 'Dang ky thanh cong. Vui long dang nhap.';
-                messageEl.style.color = 'green';
+                messageEl.textContent = 'Đăng ký thành công. Vui lòng đăng nhập.';
+                messageEl.className = 'alert alert-success';
             } else if (params.get('error')) {
                 messageEl.textContent = params.get('error');
-                messageEl.style.color = 'red';
+                messageEl.className = 'alert alert-danger';
+            } else {
+                messageEl.className = 'alert d-none';
             }
         }
+        loginForm.addEventListener('submit', (event) => {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            if (!username || !password) {
+                event.preventDefault();
+                messageEl.textContent = 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.';
+                messageEl.className = 'alert alert-warning';
+            }
+        });
     </script>
 </body>
 </html>
