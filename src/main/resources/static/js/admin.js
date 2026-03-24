@@ -66,7 +66,7 @@ async function loadPendingCompanions(tableBodyId) {
     rows.innerHTML = "";
 
     if (!data.length) {
-        rows.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Khong co ho so cho duyet.</td></tr>';
+        rows.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Không có hồ sơ chờ duyệt.</td></tr>';
         return;
     }
 
@@ -78,8 +78,8 @@ async function loadPendingCompanions(tableBodyId) {
             <td>${escapeHtml(item.bio || "")}</td>
             <td><span class="badge text-bg-warning">${escapeHtml(item.status || "PENDING")}</span></td>
             <td>
-                <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Cap tich xanh</button>
-                <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Tu choi</button>
+                <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Cấp tích xanh</button>
+                <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Từ chối</button>
             </td>
         `;
         rows.appendChild(tr);
@@ -96,7 +96,7 @@ async function loadPendingCompanions(tableBodyId) {
 async function moderateCompanion(id, isApprove, tableBodyId) {
     const url = isApprove ? `/api/admin/approve-companion/${id}` : `/api/admin/reject-companion/${id}`;
     await requestJson(url, { method: "POST" });
-    showAlert(isApprove ? "Da cap tich xanh cho Companion." : "Da tu choi ho so Companion.");
+    showAlert(isApprove ? "Đã cấp tích xanh cho Companion." : "Đã từ chối hồ sơ Companion.");
     await loadPendingCompanions(tableBodyId);
     if (document.getElementById("stat-profit")) {
         await loadDashboardStats();
@@ -117,10 +117,10 @@ async function loadUsersPage() {
             <td>${escapeHtml(user.username)}</td>
             <td>${escapeHtml(user.email)}</td>
             <td>${escapeHtml(user.role)}</td>
-            <td><span class="badge ${user.flag === "BANNED" ? "text-bg-danger" : user.flag === "WARNED" ? "text-bg-warning" : "text-bg-secondary"}">${escapeHtml(user.flag)}</span></td>
+            <td><span class="badge ${user.flag === "BANNED" ? "text-bg-danger" : user.flag === "WARNED" ? "text-bg-warning" : "text-bg-secondary"}">${escapeHtml(user.flag === "BANNED" ? "Đã khóa" : user.flag === "WARNED" ? "Đã cảnh cáo" : "Bình thường")}</span></td>
             <td>
-                <button class="btn btn-sm btn-warning me-1" data-action="warn" data-id="${user.id}">Warn</button>
-                <button class="btn btn-sm btn-danger" data-action="ban" data-id="${user.id}">Ban</button>
+                <button class="btn btn-sm btn-warning me-1" data-action="warn" data-id="${user.id}">Cảnh cáo</button>
+                <button class="btn btn-sm btn-danger" data-action="ban" data-id="${user.id}">Khóa</button>
             </td>
         `;
         usersBody.appendChild(tr);
@@ -149,7 +149,7 @@ async function loadUsersPage() {
 async function updateUserFlag(userId, action) {
     const endpoint = action === "warn" ? "warn" : "ban";
     await requestJson(`/api/admin/users/${userId}/${endpoint}`, { method: "POST" });
-    showAlert(action === "warn" ? "Da canh cao tai khoan." : "Da khoa tai khoan.");
+    showAlert(action === "warn" ? "Đã cảnh cáo tài khoản." : "Đã khóa tài khoản.");
     await loadUsersPage();
 }
 
@@ -160,7 +160,7 @@ async function loadModerationPage() {
     const reviews = await requestJson("/api/admin/moderation/reviews");
     reviewsBody.innerHTML = "";
     if (!reviews.length) {
-        reviewsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Khong co review can xu ly.</td></tr>';
+        reviewsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có review cần xử lý.</td></tr>';
         return;
     }
 
@@ -171,9 +171,9 @@ async function loadModerationPage() {
             <td>${review.bookingId || ""}</td>
             <td>${review.rating || ""}</td>
             <td>${escapeHtml(review.comment || "")}</td>
-            <td><span class="badge ${review.hidden ? "text-bg-danger" : "text-bg-success"}">${review.hidden ? "HIDDEN" : "VISIBLE"}</span></td>
+            <td><span class="badge ${review.hidden ? "text-bg-danger" : "text-bg-success"}">${review.hidden ? "Đã ẩn" : "Hiển thị"}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-danger" ${review.hidden ? "disabled" : ""} data-id="${review.id}">An binh luan</button>
+                <button class="btn btn-sm btn-outline-danger" ${review.hidden ? "disabled" : ""} data-id="${review.id}">Ẩn bình luận</button>
             </td>
         `;
         reviewsBody.appendChild(tr);
@@ -186,7 +186,7 @@ async function loadModerationPage() {
 
 async function hideReview(reviewId) {
     await requestJson(`/api/admin/moderation/reviews/${reviewId}/hide`, { method: "POST" });
-    showAlert("Da an review vi pham.");
+    showAlert("Đã ẩn review vi phạm.");
     await loadModerationPage();
 }
 
@@ -200,7 +200,7 @@ async function loadTransactionsPage() {
     const tbody = document.getElementById("withdrawals-body");
     tbody.innerHTML = "";
     if (!data.pendingWithdrawals.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Khong co lenh rut tien cho duyet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có lệnh rút tiền chờ duyệt.</td></tr>';
         return;
     }
 
@@ -213,8 +213,8 @@ async function loadTransactionsPage() {
             <td>${formatMoney(item.amount)}</td>
             <td><span class="badge text-bg-warning">${escapeHtml(item.status)}</span></td>
             <td>
-                <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Duyet</button>
-                <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Tu choi</button>
+                <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Duyệt</button>
+                <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Từ chối</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -233,7 +233,7 @@ async function reviewWithdrawal(id, approve) {
         ? `/api/admin/transactions/withdrawals/${id}/approve`
         : `/api/admin/transactions/withdrawals/${id}/reject`;
     await requestJson(url, { method: "POST" });
-    showAlert(approve ? "Da duyet lenh rut tien." : "Da tu choi lenh rut tien.");
+    showAlert(approve ? "Đã duyệt lệnh rút tiền." : "Đã từ chối lệnh rút tiền.");
     await loadTransactionsPage();
 }
 
@@ -245,7 +245,7 @@ async function saveCommissionRate(event) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commissionRate: value })
     });
-    showAlert("Da cap nhat commission rate.");
+    showAlert("Đã cập nhật tỷ lệ hoa hồng.");
     await loadTransactionsPage();
 }
 
@@ -254,7 +254,7 @@ async function loadDisputesPage() {
     const tbody = document.getElementById("disputes-body");
     tbody.innerHTML = "";
     if (!disputes.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Khong co tranh chap.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có tranh chấp.</td></tr>';
         return;
     }
 
@@ -267,10 +267,10 @@ async function loadDisputesPage() {
             <td>${escapeHtml(dispute.reason || "")}</td>
             <td><span class="badge ${dispute.status === "RESOLVED" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(dispute.status)}</span></td>
             <td class="action-group">
-                <button class="btn btn-sm btn-secondary" data-action="freeze" data-id="${dispute.id}">Freeze Escrow</button>
-                <button class="btn btn-sm btn-outline-primary" data-action="refund" data-id="${dispute.id}">Refund</button>
-                <button class="btn btn-sm btn-outline-success" data-action="payout" data-id="${dispute.id}">Payout</button>
-                <button class="btn btn-sm btn-dark" data-action="close" data-id="${dispute.id}">Close</button>
+                <button class="btn btn-sm btn-secondary" data-action="freeze" data-id="${dispute.id}">Đóng băng ký quỹ</button>
+                <button class="btn btn-sm btn-outline-primary" data-action="refund" data-id="${dispute.id}">Hoàn tiền</button>
+                <button class="btn btn-sm btn-outline-success" data-action="payout" data-id="${dispute.id}">Thanh toán</button>
+                <button class="btn btn-sm btn-dark" data-action="close" data-id="${dispute.id}">Đóng hồ sơ</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -290,7 +290,7 @@ async function processDispute(id, action) {
     };
     const endpoint = map[action];
     await requestJson(`/api/admin/disputes/${id}/${endpoint}`, { method: "POST" });
-    showAlert("Da cap nhat xu ly tranh chap.");
+    showAlert("Đã cập nhật xử lý tranh chấp.");
     await loadDisputesPage();
 }
 
@@ -351,5 +351,5 @@ async function bootstrapAdminPage() {
 
 bootstrapAdminPage().catch((error) => {
     console.error(error);
-    showAlert("Khong the tai du lieu admin. Vui long thu lai.", "danger");
+    showAlert("Không thể tải dữ liệu admin. Vui lòng thử lại.", "danger");
 });
