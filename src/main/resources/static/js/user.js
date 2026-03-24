@@ -205,26 +205,119 @@ async function initBookingPage(auth) {
     const params = new URLSearchParams(window.location.search);
     const companionId = params.get("id");
     const companionSelect = document.getElementById("companionId");
+    const serviceSelect = document.getElementById("servicePriceId");
+    const servicePriceHint = document.getElementById("booking-service-price-hint");
+    let currentServices = [];
     const companions = await (async () => {
         const res = await apiFetch("/api/companions");
         return res.ok ? res.json() : [];
     })();
-    companionSelect.innerHTML = companions.map((c) => {
+    const onlineCompanions = companions.filter((c) => Boolean(c.onlineStatus));
+    companionSelect.innerHTML = onlineCompanions.map((c) => {
         const name = c.user?.fullName || c.user?.username || `Companion #${c.id}`;
         return `<option value="${c.id}">${escapeHtml(name)}</option>`;
     }).join("");
-    if (companionId) companionSelect.value = companionId;
+    if (!onlineCompanions.length) {
+        companionSelect.innerHTML = `<option value="">Không có companion online</option>`;
+        companionSelect.disabled = true;
+        setMessage("booking-message", "warning", "Hiện chưa có companion online để đặt lịch.");
+        return;
+    }
+    if (companionId) {
+        const selectedOnline = onlineCompanions.some((c) => String(c.id) === String(companionId));
+        if (selectedOnline) {
+            companionSelect.value = companionId;
+        } else {
+            setMessage("booking-message", "warning", "Companion này đang offline, vui lòng chọn companion online khác.");
+        }
+    }
+    async function loadServicesByCompanion(selectedCompanionId) {
+        currentServices = [];
+        if (!selectedCompanionId) {
+            serviceSelect.innerHTML = `<option value="">Chọn companion để tải dịch vụ</option>`;
+            if (servicePriceHint) servicePriceHint.textContent = "";
+            return;
+        }
+        const res = await apiFetch(`/api/companions/${selectedCompanionId}/service-prices`, { headers: {} });
+        currentServices = res.ok ? await res.json() : [];
+        if (!currentServices.length) {
+            serviceSelect.innerHTML = `<option value="">Companion chưa cấu hình dịch vụ</option>`;
+            if (servicePriceHint) servicePriceHint.textContent = "Companion này chưa có dịch vụ cố định để đặt.";
+            return;
+        }
+        serviceSelect.innerHTML = currentServices.map((s) =>
+            `<option value="${s.id}">${escapeHtml(s.serviceName || "Dịch vụ")} - ${Number(s.pricePerHour || 0).toLocaleString("vi-VN")} VND/giờ</option>`
+        ).join("");
+        if (servicePriceHint) {
+            const first = currentServices[0];
+            servicePriceHint.textContent = `Giá đang chọn: ${Number(first.pricePerHour || 0).toLocaleString("vi-VN")} VND/giờ`;
+        }
+    }
+
+    companionSelect?.addEventListener("change", async () => {
+        await loadServicesByCompanion(Number(companionSelect.value));
+    });
+    serviceSelect?.addEventListener("change", () => {
+        const selected = currentServices.find((s) => String(s.id) === String(serviceSelect.value));
+        if (servicePriceHint && selected) {
+            servicePriceHint.textContent = `Giá đang chọn: ${Number(selected.pricePerHour || 0).toLocaleString("vi-VN")} VND/giờ`;
+        }
+    });
+    await loadServicesByCompanion(Number(companionSelect.value));
     document.getElementById("bookingTime").value = toDateInputValue();
+
+    const imageInput = document.getElementById("bookingImage");
+    const imagePreviewWrap = document.getElementById("booking-image-preview-wrap");
+    const imagePreview = document.getElementById("booking-image-preview");
+    const clearImageBtn = document.getElementById("booking-image-clear-btn");
+    let previewUrl = "";
+
+    imageInput?.addEventListener("change", () => {
+        const file = imageInput.files?.[0];
+        if (!file) {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = "";
+            imagePreviewWrap?.classList.add("d-none");
+            if (imagePreview) imagePreview.src = "";
+            return;
+        }
+        if (!file.type.startsWith("image/")) {
+            setMessage("booking-message", "warning", "Vui lòng chọn tệp ảnh hợp lệ.");
+            imageInput.value = "";
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = "";
+            imagePreviewWrap?.classList.add("d-none");
+            if (imagePreview) imagePreview.src = "";
+            return;
+        }
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(file);
+        if (imagePreview) imagePreview.src = previewUrl;
+        imagePreviewWrap?.classList.remove("d-none");
+    });
+
+    clearImageBtn?.addEventListener("click", () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = "";
+        if (imageInput) imageInput.value = "";
+        if (imagePreview) imagePreview.src = "";
+        imagePreviewWrap?.classList.add("d-none");
+    });
 
     document.getElementById("booking-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
         const payload = {
             companionId: Number(document.getElementById("companionId").value),
+            servicePriceId: Number(document.getElementById("servicePriceId").value),
             bookingTime: document.getElementById("bookingTime").value,
             duration: Number(document.getElementById("duration").value),
             location: document.getElementById("location").value,
             note: document.getElementById("note").value
         };
+        if (!payload.servicePriceId) {
+            setMessage("booking-message", "warning", "Vui lòng chọn dịch vụ của companion trước khi đặt lịch.");
+            return;
+        }
         const res = await apiFetch("/api/bookings", { method: "POST", body: JSON.stringify(payload) });
         if (res.ok) {
             window.location.href = "/user/appointments.html";
@@ -248,6 +341,8 @@ async function initAppointmentsPage(auth) {
           <div class="col-md-6"><strong>Tiền cọc:</strong> ${escapeHtml(Number(b.holdAmount || 0).toLocaleString("vi-VN"))} VND</div>
           <div class="col-md-6"><strong>Địa điểm:</strong> ${escapeHtml(b.location || "-")}</div>
           <div class="col-md-6"><strong>Trạng thái:</strong> ${escapeHtml(b.status || "-")}</div>
+          <div class="col-md-6"><strong>Dịch vụ:</strong> ${escapeHtml(b.serviceName || "-")}</div>
+          <div class="col-md-6"><strong>Giá dịch vụ:</strong> ${Number(b.servicePricePerHour || 0).toLocaleString("vi-VN")} VND/giờ</div>
           <div class="col-12 mt-2"><strong>Ghi chú:</strong> ${escapeHtml(b.note || "-")}</div>
         </div>
         <div class="d-flex gap-2 mt-3">
@@ -256,6 +351,7 @@ async function initAppointmentsPage(auth) {
           ${b.status === "IN_PROGRESS" ? `<button class="btn btn-success btn-sm booking-action" data-id="${b.id}" data-action="check-out">Check-out</button>` : ""}
           ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<button class="btn btn-outline-secondary btn-sm booking-action" data-id="${b.id}" data-action="extend">Gia hạn 30p</button>` : ""}
           ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<a class="btn btn-outline-dark btn-sm" href="/user/chat.html?bookingId=${b.id}">Chat/Call</a>` : ""}
+          ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<a class="btn btn-danger btn-sm" href="/user/report.html?reportedUserId=${b.companion?.user?.id || ""}&bookingId=${b.id}&emergency=1"><i class="bi bi-exclamation-octagon me-1"></i>SOS</a>` : ""}
         </div>
       </div></div>`).join("") : `<div class="empty-state">Bạn chưa có lịch hẹn nào.</div>`;
 
@@ -378,6 +474,40 @@ async function initReportPage(auth) {
     const reportedUserInput = document.getElementById("reportedUserId");
     if (params.get("reportedUserId")) {
         reportedUserInput.value = params.get("reportedUserId");
+    }
+    async function buildEmergencyReasonFromBooking(bookingId) {
+        if (!bookingId) return "SOS khẩn cấp. Cần hỗ trợ ngay.";
+        const res = await apiFetch("/api/bookings/me", { headers: {} });
+        const bookings = res.ok ? await res.json() : [];
+        const booking = bookings.find((b) => Number(b.id) === Number(bookingId));
+        if (!booking) {
+            return `SOS khẩn cấp tại booking #${bookingId}. Cần hỗ trợ ngay.`;
+        }
+        const partner = booking.companion?.user?.fullName || booking.companion?.user?.username || `Companion #${booking.companion?.id || "-"}`;
+        return `SOS khẩn cấp tại booking #${booking.id}. Companion: ${partner}. Thời gian: ${formatDateTime(booking.bookingTime)}. Địa điểm: ${booking.location || "-"}. Cần hỗ trợ ngay.`;
+    }
+
+    document.getElementById("quick-sos-toggle")?.addEventListener("click", async () => {
+        const emergencyCheckbox = document.getElementById("isEmergency");
+        if (emergencyCheckbox) emergencyCheckbox.checked = true;
+        const reason = document.getElementById("reason");
+        if (reason && !reason.value.trim()) {
+            const bookingIdFromQuery = new URLSearchParams(window.location.search).get("bookingId");
+            reason.value = await buildEmergencyReasonFromBooking(bookingIdFromQuery);
+        }
+        reason?.focus();
+    });
+    const emergencyQuick = params.get("emergency") === "1";
+    const bookingIdFromQuery = params.get("bookingId");
+    if (emergencyQuick) {
+        const emergencyCheckbox = document.getElementById("isEmergency");
+        if (emergencyCheckbox) emergencyCheckbox.checked = true;
+        const category = document.getElementById("reportCategory");
+        if (category) category.value = "OTHER";
+        const reason = document.getElementById("reason");
+        if (reason && !reason.value.trim()) {
+            reason.value = await buildEmergencyReasonFromBooking(bookingIdFromQuery);
+        }
     }
     document.getElementById("report-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -572,6 +702,51 @@ async function refreshNotifications() {
     badge.classList.toggle("d-none", unread <= 0);
     link.href = "/user/notifications.html";
     link.onclick = null;
+    processRealtimeUserNotifications(list);
+}
+
+const userRealtimeNotifState = {
+    initialized: false,
+    seenIds: new Set()
+};
+
+function getUserToastContainer() {
+    let box = document.getElementById("user-realtime-toast-container");
+    if (box) return box;
+    box = document.createElement("div");
+    box.id = "user-realtime-toast-container";
+    box.style.cssText = "position:fixed;top:16px;right:16px;z-index:1080;display:flex;flex-direction:column;gap:8px;max-width:360px;";
+    document.body.appendChild(box);
+    return box;
+}
+
+function showUserNotificationToast(notification) {
+    const box = getUserToastContainer();
+    const item = document.createElement("div");
+    item.className = "shadow rounded-3 border bg-white p-3";
+    item.innerHTML = `
+        <div class="fw-semibold mb-1"><i class="bi bi-bell-fill text-primary me-2"></i>${escapeHtml(notification.title || "Thông báo mới")}</div>
+        <div class="small text-muted">${escapeHtml(notification.content || "")}</div>
+    `;
+    box.appendChild(item);
+    setTimeout(() => item.remove(), 4500);
+}
+
+function processRealtimeUserNotifications(list) {
+    const sorted = [...(Array.isArray(list) ? list : [])]
+        .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    if (!userRealtimeNotifState.initialized) {
+        sorted.forEach((n) => userRealtimeNotifState.seenIds.add(Number(n.id)));
+        userRealtimeNotifState.initialized = true;
+        return;
+    }
+    sorted.forEach((n) => {
+        const id = Number(n.id);
+        if (!userRealtimeNotifState.seenIds.has(id)) {
+            userRealtimeNotifState.seenIds.add(id);
+            showUserNotificationToast(n);
+        }
+    });
 }
 
 function notifIcon(title) {

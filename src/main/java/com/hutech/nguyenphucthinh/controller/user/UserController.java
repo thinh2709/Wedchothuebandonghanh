@@ -47,6 +47,12 @@ public class UserController {
         Optional<User> user = userService.login(username, password);
         Map<String, Object> response = new HashMap<>();
         if (user.isPresent()) {
+            if (Boolean.TRUE.equals(user.get().getLocked())
+                    || User.ModerationFlag.BANNED.equals(user.get().getModerationFlag())) {
+                response.put("success", false);
+                response.put("message", "Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.");
+                return response;
+            }
             String effectiveRole = companionRepository.findByUserId(user.get().getId()).isPresent()
                     ? "COMPANION"
                     : user.get().getRole().name();

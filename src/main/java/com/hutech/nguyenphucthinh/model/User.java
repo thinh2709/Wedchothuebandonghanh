@@ -36,9 +36,20 @@ public class User {
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ModerationFlag moderationFlag = ModerationFlag.NONE;
+
+    @Column(nullable = false)
+    private Boolean locked = false;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public enum Role {
         CUSTOMER, COMPANION, ADMIN
+    }
+
+    public enum ModerationFlag {
+        NONE, WARNED, BANNED
     }
 }

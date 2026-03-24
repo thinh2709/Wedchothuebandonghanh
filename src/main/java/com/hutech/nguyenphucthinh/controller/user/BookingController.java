@@ -21,14 +21,15 @@ public class BookingController {
             throw new RuntimeException("Please login first");
         }
         Number companionId = (Number) request.get("companionId");
+        Number servicePriceId = (Number) request.get("servicePriceId");
         String bookingTime = (String) request.get("bookingTime");
         Number duration = (Number) request.get("duration");
         String location = (String) request.getOrDefault("location", "");
         String note = (String) request.getOrDefault("note", "");
-        if (companionId == null || bookingTime == null || duration == null) {
-            throw new RuntimeException("companionId, bookingTime, duration are required");
+        if (companionId == null || servicePriceId == null || bookingTime == null || duration == null) {
+            throw new RuntimeException("companionId, servicePriceId, bookingTime, duration are required");
         }
-        return bookingService.createBooking(userId, companionId.longValue(), bookingTime, duration.intValue(), location, note);
+        return bookingService.createBooking(userId, companionId.longValue(), servicePriceId.longValue(), bookingTime, duration.intValue(), location, note);
     }
 
     @GetMapping("/me")

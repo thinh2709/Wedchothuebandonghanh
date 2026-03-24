@@ -28,11 +28,20 @@ describe('USER full flow: UI to API', () => {
     cy.request('POST', '/api/user/logout');
   }
 
-  function pickCompanion() {
+  function pickOnlineCompanionWithService() {
     return cy.request('/api/companions').then((res) => {
       expect(res.status).to.eq(200);
       expect(res.body).to.be.an('array');
-      return res.body[0] || null;
+      const online = (res.body || []).find((c) => c.onlineStatus === true);
+      if (!online) return null;
+      return cy.request(`/api/companions/${online.id}/service-prices`).then((spRes) => {
+        const firstService = (spRes.body || [])[0];
+        if (!firstService) return null;
+        return {
+          companion: online,
+          servicePriceId: firstService.id,
+        };
+      });
     });
   }
 
@@ -40,7 +49,7 @@ describe('USER full flow: UI to API', () => {
     register(customer);
   });
 
-  it('nạp ví, yêu thích, booking, chat/call, review, report', () => {
+  it('nạp ví, yêu thích, booking đúng service, chat/call, report', () => {
     login(customer);
 
     cy.intercept('GET', '/api/wallet/me').as('walletMe');
@@ -55,21 +64,28 @@ describe('USER full flow: UI to API', () => {
     cy.get('#wallet-message').should('contain.text', 'Nạp tiền thành công');
     cy.wait('@walletTx').its('response.statusCode').should('eq', 200);
 
-    pickCompanion().then((companion) => {
-      if (!companion) {
-        cy.log('Skip nhánh booking/review/report: chưa có companion');
+    pickOnlineCompanionWithService().then((ctx) => {
+      if (!ctx) {
+        cy.log('Skip booking/chat/report: chưa có companion online có service');
         return;
       }
+      const { companion, servicePriceId } = ctx;
 
       cy.intercept('POST', `/api/favorites/${companion.id}`).as('addFavoriteApi');
       cy.visit(`/user/profile.html?id=${companion.id}`);
       cy.get('#add-favorite-btn').click();
       cy.wait('@addFavoriteApi').its('response.statusCode').should('eq', 200);
-      cy.get('#profile-message').should('contain.text', 'yeu thich');
+      cy.get('#profile-message').invoke('text').should('match', /yêu thích|yeu thich/i);
 
+      cy.intercept('GET', `/api/companions/${companion.id}/service-prices`).as('servicePricesApi');
       cy.intercept('POST', '/api/bookings').as('createBookingApi');
       cy.intercept('GET', '/api/bookings/me').as('myBookingsApi');
       cy.visit(`/user/booking.html?id=${companion.id}`);
+      cy.wait('@servicePricesApi').its('response.statusCode').should('eq', 200);
+      cy.get('#servicePriceId option').its('length').should('be.greaterThan', 1);
+      cy.get('#servicePriceId').select(String(servicePriceId));
+      cy.get('#booking-service-price-hint').invoke('text').should('not.equal', '');
+      cy.get('#bookingTime').type('2030-12-31T20:00');
       cy.get('#duration').clear().type('60');
       cy.get('#location').clear().type('Quan 1');
       cy.get('#note').clear().type('booking by cypress');
@@ -77,6 +93,7 @@ describe('USER full flow: UI to API', () => {
       cy.wait('@createBookingApi').then(({ response }) => {
         expect(response.statusCode).to.eq(200);
         expect(response.body).to.have.property('id');
+        expect(response.body).to.have.property('servicePricePerHour');
       });
       cy.url().should('include', '/user/appointments.html');
       cy.wait('@myBookingsApi').its('response.statusCode').should('eq', 200);
@@ -84,7 +101,7 @@ describe('USER full flow: UI to API', () => {
 
       cy.request('/api/bookings/me').then((bookingRes) => {
         const bookings = bookingRes.body || [];
-        const booking = bookings[0];
+        const booking = bookings.find((b) => b.companion?.id === companion.id) || bookings[0];
         if (!booking) {
           cy.log('Skip chat/review: chưa lấy được booking');
           return;
@@ -121,6 +138,7 @@ describe('USER full flow: UI to API', () => {
         cy.get('#report-form').submit();
         cy.wait('@reportApi').its('response.statusCode').should('eq', 200);
         cy.get('#report-message').should('contain.text', 'Gửi tố cáo thành công');
+        cy.get('#report-list').find('.card').its('length').should('be.greaterThan', 0);
       }
     });
 

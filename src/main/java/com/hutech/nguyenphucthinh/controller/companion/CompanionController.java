@@ -47,6 +47,11 @@ public class CompanionController {
         return companionService.getCompanionById(id);
     }
 
+    @GetMapping("/{id}/service-prices")
+    public List<ServicePrice> getServicePricesByCompanionId(@PathVariable Long id) {
+        return companionService.getServicePricesByCompanionId(id);
+    }
+
     @PostMapping("/register")
     public Companion registerCompanion(@RequestBody Map<String, String> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
@@ -304,6 +309,29 @@ public class CompanionController {
         return companionService.getWithdrawals(userId);
     }
 
+    @GetMapping("/me/bank-account")
+    public Map<String, String> getMyBankAccount(HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.getPayoutBankAccount(userId);
+    }
+
+    @PutMapping("/me/bank-account")
+    public Map<String, String> updateMyBankAccount(@RequestBody Map<String, String> request, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return companionService.updatePayoutBankAccount(
+                userId,
+                request.getOrDefault("bankName", ""),
+                request.getOrDefault("bankAccountNumber", ""),
+                request.getOrDefault("accountHolderName", "")
+        );
+    }
+
     @PostMapping("/me/withdrawals")
     public Withdrawal createWithdrawal(@RequestBody Map<String, String> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
@@ -312,10 +340,7 @@ public class CompanionController {
         }
         return companionService.createWithdrawal(
                 userId,
-                request.get("amount") == null ? null : new BigDecimal(request.get("amount")),
-                request.getOrDefault("bankName", ""),
-                request.getOrDefault("bankAccountNumber", ""),
-                request.getOrDefault("accountHolderName", "")
+                request.get("amount") == null ? null : new BigDecimal(request.get("amount"))
         );
     }
 

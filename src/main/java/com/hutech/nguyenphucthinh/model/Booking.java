@@ -33,6 +33,11 @@ public class Booking {
     @Column(length = 255)
     private String location;
 
+    @Column(length = 120)
+    private String serviceName;
+
+    private BigDecimal servicePricePerHour;
+
     @Column(columnDefinition = "TEXT")
     private String note;
 

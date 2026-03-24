@@ -212,7 +212,6 @@ public class CompanionService {
             throw new RuntimeException("Đơn đặt lịch đã được xử lý");
         }
         if (status == Booking.Status.ACCEPTED) {
-            walletService.holdForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
             notificationService.create(
                     booking.getCustomer().getId(),
                     "Booking được chấp nhận",
@@ -220,6 +219,7 @@ public class CompanionService {
             );
         }
         if (status == Booking.Status.REJECTED) {
+            walletService.refundForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
             notificationService.create(
                     booking.getCustomer().getId(),
                     "Booking bị từ chối",
@@ -303,6 +303,17 @@ public class CompanionService {
         booking.setSosNote(note);
         booking.setCheckInLatitude(lat);
         booking.setCheckInLongitude(lng);
+        notificationService.create(
+                booking.getCustomer().getId(),
+                "Cảnh báo SOS từ companion",
+                "Companion đã kích hoạt SOS cho đơn #" + booking.getId() + ". Vui lòng giữ liên lạc ngay."
+        );
+        userRepository.findByRole(User.Role.ADMIN).forEach(admin -> notificationService.create(
+                admin.getId(),
+                "SOS KHẨN CẤP",
+                "Companion #" + companion.getId() + " đã kích hoạt SOS tại đơn #" + booking.getId()
+                        + (note == null || note.isBlank() ? "" : (". Ghi chú: " + note.trim()))
+        ));
         return bookingRepository.save(booking);
     }
 
@@ -352,6 +363,11 @@ public class CompanionService {
         return servicePriceRepository.findByCompanionIdOrderByIdDesc(companion.getId());
     }
 
+    public List<ServicePrice> getServicePricesByCompanionId(Long companionId) {
+        companionRepository.findById(companionId).orElseThrow(() -> new RuntimeException("Không tìm thấy companion"));
+        return servicePriceRepository.findByCompanionIdOrderByIdDesc(companionId);
+    }
+
     public ServicePrice addServicePrice(Long userId, String serviceName, BigDecimal pricePerHour, String description) {
         if (pricePerHour == null || pricePerHour.signum() <= 0) {
             throw new RuntimeException("Giá phải lớn hơn 0");
@@ -379,10 +395,16 @@ public class CompanionService {
         return withdrawalRepository.findByCompanionIdOrderByCreatedAtDesc(companion.getId());
     }
 
-    public Withdrawal createWithdrawal(Long userId, BigDecimal amount, String bankName, String bankAccountNumber, String accountHolderName) {
-        if (amount == null || amount.signum() <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền rút phải lớn hơn 0");
-        }
+    public Map<String, String> getPayoutBankAccount(Long userId) {
+        Companion companion = getCompanionByUserId(userId);
+        Map<String, String> data = new HashMap<>();
+        data.put("bankName", companion.getPayoutBankName() == null ? "" : companion.getPayoutBankName());
+        data.put("bankAccountNumber", companion.getPayoutBankAccountNumber() == null ? "" : companion.getPayoutBankAccountNumber());
+        data.put("accountHolderName", companion.getPayoutAccountHolderName() == null ? "" : companion.getPayoutAccountHolderName());
+        return data;
+    }
+
+    public Map<String, String> updatePayoutBankAccount(Long userId, String bankName, String bankAccountNumber, String accountHolderName) {
         if (bankName == null || bankName.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên ngân hàng là bắt buộc");
         }
@@ -393,6 +415,23 @@ public class CompanionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên chủ tài khoản là bắt buộc");
         }
         Companion companion = getCompanionByUserId(userId);
+        companion.setPayoutBankName(bankName.trim());
+        companion.setPayoutBankAccountNumber(bankAccountNumber.trim());
+        companion.setPayoutAccountHolderName(accountHolderName.trim());
+        companionRepository.save(companion);
+        return getPayoutBankAccount(userId);
+    }
+
+    public Withdrawal createWithdrawal(Long userId, BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền rút phải lớn hơn 0");
+        }
+        Companion companion = getCompanionByUserId(userId);
+        if (companion.getPayoutBankName() == null || companion.getPayoutBankName().isBlank()
+                || companion.getPayoutBankAccountNumber() == null || companion.getPayoutBankAccountNumber().isBlank()
+                || companion.getPayoutAccountHolderName() == null || companion.getPayoutAccountHolderName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng thiết lập tài khoản ngân hàng trước khi rút tiền");
+        }
         BigDecimal available = transactionRepository.sumCompletedIncomeByCompanionId(companion.getId())
                 .subtract(withdrawalRepository.sumLockedAmountByCompanionId(companion.getId()));
         if (available.signum() < 0) {
@@ -404,9 +443,9 @@ public class CompanionService {
         Withdrawal withdrawal = new Withdrawal();
         withdrawal.setCompanion(companion);
         withdrawal.setAmount(amount);
-        withdrawal.setBankName(bankName.trim());
-        withdrawal.setBankAccountNumber(bankAccountNumber.trim());
-        withdrawal.setAccountHolderName(accountHolderName.trim());
+        withdrawal.setBankName(companion.getPayoutBankName());
+        withdrawal.setBankAccountNumber(companion.getPayoutBankAccountNumber());
+        withdrawal.setAccountHolderName(companion.getPayoutAccountHolderName());
         withdrawal.setStatus(Withdrawal.Status.PENDING);
         return withdrawalRepository.save(withdrawal);
     }

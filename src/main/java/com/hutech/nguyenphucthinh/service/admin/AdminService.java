@@ -39,7 +39,6 @@ public class AdminService {
     private EntityManager entityManager;
 
     private volatile BigDecimal commissionRate = new BigDecimal("0.15");
-    private final Map<Long, String> userFlags = new ConcurrentHashMap<>();
     private final Set<Long> hiddenReviewIds = ConcurrentHashMap.newKeySet();
     private final Map<Long, String> disputeActions = new ConcurrentHashMap<>();
 
@@ -92,7 +91,7 @@ public class AdminService {
             item.put("email", user.getEmail());
             item.put("role", user.getRole());
             item.put("fullName", user.getFullName());
-            item.put("flag", userFlags.getOrDefault(user.getId(), "NONE"));
+            item.put("flag", user.getModerationFlag() == null ? "NONE" : user.getModerationFlag().name());
             users.add(item);
         }
 
@@ -104,7 +103,12 @@ public class AdminService {
             item.put("username", companion.getUser() != null ? companion.getUser().getUsername() : "");
             item.put("status", companion.getStatus());
             item.put("bio", companion.getBio());
-            item.put("flag", companion.getUser() == null ? "NONE" : userFlags.getOrDefault(companion.getUser().getId(), "NONE"));
+            item.put(
+                    "flag",
+                    companion.getUser() == null || companion.getUser().getModerationFlag() == null
+                            ? "NONE"
+                            : companion.getUser().getModerationFlag().name()
+            );
             companions.add(item);
         }
 
@@ -115,20 +119,25 @@ public class AdminService {
     }
 
     public Map<String, Object> warnUser(Long userId) {
-        userRepository.findById(userId).orElseThrow();
-        userFlags.put(userId, "WARNED");
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setModerationFlag(User.ModerationFlag.WARNED);
+        userRepository.save(user);
         return Map.of("message", "Đã cảnh cáo người dùng", "userId", userId, "flag", "WARNED");
     }
 
     public Map<String, Object> banUser(Long userId) {
-        userRepository.findById(userId).orElseThrow();
-        userFlags.put(userId, "BANNED");
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setModerationFlag(User.ModerationFlag.BANNED);
+        user.setLocked(true);
+        userRepository.save(user);
         return Map.of("message", "Đã khóa tài khoản", "userId", userId, "flag", "BANNED");
     }
 
     public Map<String, Object> resetUserStatus(Long userId) {
-        userRepository.findById(userId).orElseThrow();
-        userFlags.remove(userId);
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setModerationFlag(User.ModerationFlag.NONE);
+        user.setLocked(false);
+        userRepository.save(user);
         return Map.of("message", "Đã khôi phục trạng thái bình thường", "userId", userId, "flag", "NONE");
     }
 

@@ -71,6 +71,15 @@ public class Companion {
     @Column(columnDefinition = "TEXT")
     private String skills;
 
+    @Column(length = 100)
+    private String payoutBankName;
+
+    @Column(length = 30)
+    private String payoutBankAccountNumber;
+
+    @Column(length = 100)
+    private String payoutAccountHolderName;
+
     @Transient
     private Double responseRate;
 

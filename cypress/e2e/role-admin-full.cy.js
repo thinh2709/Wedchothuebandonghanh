@@ -14,7 +14,7 @@ describe('ADMIN full flow: UI to API', () => {
     cy.url().should('include', '/admin/dashboard.html');
   }
 
-  it('dashboard, users, moderation, transactions, disputes', () => {
+  it('dashboard, users, moderation (xem hồ sơ trước khi duyệt), transactions, disputes', () => {
     if (!admin.username || !admin.password) {
       cy.log('Skip: cần cấu hình ADMIN_USERNAME và ADMIN_PASSWORD');
       return;
@@ -43,6 +43,22 @@ describe('ADMIN full flow: UI to API', () => {
     cy.get('#moderation-pending-body').should('exist');
     cy.get('#reviews-body').should('exist');
 
+    cy.get('#moderation-pending-body').then(($tbody) => {
+      const hasRow = $tbody.find('tr').length > 0 && !$tbody.text().includes('Không có hồ sơ');
+      if (hasRow) {
+        cy.get('#moderation-pending-body tr').first().within(() => {
+          cy.contains('button', 'Xem hồ sơ').should('exist').click();
+          cy.contains('button', 'Cấp tích xanh').should('not.exist');
+        });
+        cy.get('#companion-review-modal').should('be.visible');
+        cy.get('#companion-review-detail').invoke('text').should('not.equal', '');
+        cy.intercept('POST', /\/api\/admin\/approve-companion\/\d+/).as('approveCompanionApi');
+        cy.get('#companion-approve-btn').click();
+        cy.wait('@approveCompanionApi').its('response.statusCode').should('eq', 200);
+        cy.get('#admin-alert').invoke('text').should('match', /cấp tích xanh|duyệt/i);
+      }
+    });
+
     cy.intercept('GET', '/api/admin/transactions').as('transactionsApi');
     cy.intercept('PUT', '/api/admin/transactions/commission-rate').as('commissionApi');
     cy.intercept('POST', /\/api\/admin\/transactions\/withdrawals\/\d+\/approve/).as('approveWithdrawalApi');
@@ -51,13 +67,13 @@ describe('ADMIN full flow: UI to API', () => {
     cy.get('#commission-rate').clear().type('0.2');
     cy.get('#commission-form').submit();
     cy.wait('@commissionApi').its('response.statusCode').should('eq', 200);
-    cy.get('#admin-alert').should('contain.text', 'hoa hồng');
+    cy.get('#admin-alert').invoke('text').should('match', /hoa hồng|commission/i);
     cy.get('#withdrawals-body').then(($tbody) => {
       const hasApproveButton = $tbody.find('button[data-action="approve"]').length > 0;
       if (hasApproveButton) {
         cy.wrap($tbody).find('button[data-action="approve"]').first().click();
         cy.wait('@approveWithdrawalApi').its('response.statusCode').should('eq', 200);
-        cy.get('#admin-alert').should('contain.text', 'duyet lenh rut tien');
+        cy.get('#admin-alert').invoke('text').should('match', /duyệt lệnh rút tiền|duyet lenh rut tien/i);
       }
     });
 

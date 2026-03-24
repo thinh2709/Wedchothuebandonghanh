@@ -33,6 +33,12 @@
                     <select id="companionId" class="form-select" required></select>
                 </div>
                 <div class="col-md-6">
+                    <label for="servicePriceId" class="form-label"><i class="bi bi-tag me-1"></i>Dịch vụ</label>
+                    <select id="servicePriceId" class="form-select" required>
+                        <option value="">Chọn companion để tải dịch vụ</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
                     <label for="bookingTime" class="form-label"><i class="bi bi-clock me-1"></i>Thời gian bắt đầu</label>
                     <input id="bookingTime" type="datetime-local" class="form-control" required>
                 </div>
@@ -45,8 +51,24 @@
                     <input id="location" type="text" class="form-control" placeholder="Quận 1, TP.HCM / Tên game room...">
                 </div>
                 <div class="col-12">
+                    <div class="small text-muted mb-1" id="booking-service-price-hint"></div>
+                </div>
+                <div class="col-12">
                     <label for="note" class="form-label"><i class="bi bi-chat-left-text me-1"></i>Ghi chú</label>
                     <textarea id="note" rows="3" class="form-control" placeholder="Thêm thông tin cần lưu ý"></textarea>
+                </div>
+                <div class="col-12">
+                    <label for="bookingImage" class="form-label"><i class="bi bi-image me-1"></i>Ảnh mô tả (xem trước)</label>
+                    <input id="bookingImage" type="file" class="form-control" accept="image/*">
+                    <div class="form-text">Hỗ trợ jpg, png, webp. Ảnh sẽ được xem trước trước khi gửi yêu cầu.</div>
+                </div>
+                <div class="col-12 d-none" id="booking-image-preview-wrap">
+                    <div class="border rounded-3 p-2 bg-white" style="max-width: 320px;">
+                        <img id="booking-image-preview" alt="Preview ảnh đặt lịch" class="img-fluid rounded" style="max-height: 220px; object-fit: cover;">
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="booking-image-clear-btn">
+                        <i class="bi bi-x-circle me-1"></i>Xóa ảnh
+                    </button>
                 </div>
                 <div class="col-12 d-grid mt-2">
                     <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-check2-circle me-2"></i>Xác nhận đặt lịch</button>

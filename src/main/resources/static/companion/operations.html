@@ -22,6 +22,7 @@
                 <a class="nav-link active" href="/companion/operations.html"><i class="bi bi-calendar-range me-1"></i>Lịch & Dịch vụ</a>
                 <a class="nav-link" href="/companion/bookings.html"><i class="bi bi-bag-check me-1"></i>Đơn hàng</a>
                 <a class="nav-link" href="/companion/finance.html"><i class="bi bi-currency-dollar me-1"></i>Tài chính</a>
+                <a class="nav-link" href="/companion/chat.html"><i class="bi bi-chat-dots me-1"></i>Chat/Call</a>
                 <a class="nav-link" href="/companion/notifications.html"><i class="bi bi-bell me-1"></i>Thông báo</a>
                 <a class="nav-link text-warning" href="#" id="logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Đăng xuất</a>
             </div>
@@ -40,28 +41,16 @@
 
     <section class="card shadow-sm mb-4">
         <div class="card-body p-4">
-            <h2 class="h5"><i class="bi bi-calendar-plus ms-3 me-2"></i>Lịch rảnh chi tiết</h2>
-            <form id="availability-form" class="row g-3 mt-2">
-                <div class="col-md-4">
-                    <label for="start-time" class="form-label"><i class="bi bi-play-circle me-1"></i>Bắt đầu</label>
-                    <input id="start-time" type="datetime-local" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                    <label for="end-time" class="form-label"><i class="bi bi-stop-circle me-1"></i>Kết thúc</label>
-                    <input id="end-time" type="datetime-local" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                    <label for="note" class="form-label"><i class="bi bi-sticky me-1"></i>Ghi chú</label>
-                    <input id="note" class="form-control" placeholder="Ghi chú thêm">
-                </div>
-                <div class="col-12">
-                    <button class="btn btn-success" type="submit"><i class="bi bi-plus-lg me-1"></i>Thêm khung giờ</button>
-                </div>
-            </form>
+            <h2 class="h5"><i class="bi bi-calendar-plus ms-3 me-2"></i>Lịch hoạt động tự động</h2>
+            <div class="alert alert-info mt-2 mb-3">
+                <div class="fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>Quy tắc mới</div>
+                <div>Khi bạn bật online: hệ thống mặc định bạn <strong>rảnh toàn bộ</strong>. Các khung giờ có booking sẽ tự hiển thị là <strong>bận</strong>.</div>
+            </div>
+            <div id="availability-mode-hint" class="small text-muted mb-2"></div>
             <div class="table-responsive mt-3">
                 <table class="table table-striped align-middle">
                     <thead>
-                    <tr><th>Bắt đầu</th><th>Kết thúc</th><th>Ghi chú</th><th></th></tr>
+                    <tr><th>Bắt đầu</th><th>Kết thúc</th><th>Trạng thái</th><th>Ghi chú</th></tr>
                     </thead>
                     <tbody id="availability-body"></tbody>
                 </table>

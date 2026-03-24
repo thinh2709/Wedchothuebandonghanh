@@ -52,6 +52,151 @@ function fmtDateTime(value) {
     return new Date(value).toLocaleString('vi-VN');
 }
 
+const companionChartState = {
+    range: 'month',
+    bookingChart: null,
+    statusChart: null,
+    payload: null
+};
+
+function startOfWeekLocal(date) {
+    const d = new Date(date);
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function buildCompanionBuckets(range) {
+    const now = new Date();
+    const buckets = [];
+    if (range === 'day') {
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            d.setHours(0, 0, 0, 0);
+            buckets.push({
+                key: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+                label: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+            });
+        }
+    } else if (range === 'week') {
+        const current = startOfWeekLocal(now);
+        for (let i = 7; i >= 0; i--) {
+            const d = new Date(current);
+            d.setDate(d.getDate() - i * 7);
+            const week = Math.ceil((((d - new Date(d.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
+            buckets.push({ key: `${d.getFullYear()}-W${week}`, label: `Tuần ${week}` });
+        }
+    } else if (range === 'year') {
+        for (let i = 4; i >= 0; i--) {
+            const y = now.getFullYear() - i;
+            buckets.push({ key: String(y), label: String(y) });
+        }
+    } else {
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            buckets.push({
+                key: `${d.getFullYear()}-${d.getMonth() + 1}`,
+                label: d.toLocaleDateString('vi-VN', { month: '2-digit', year: '2-digit' })
+            });
+        }
+    }
+    return buckets;
+}
+
+function toCompanionBucketKey(dateValue, range) {
+    const d = new Date(dateValue);
+    if (Number.isNaN(d.getTime())) return null;
+    if (range === 'day') return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    if (range === 'week') {
+        const s = startOfWeekLocal(d);
+        const week = Math.ceil((((s - new Date(s.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
+        return `${s.getFullYear()}-W${week}`;
+    }
+    if (range === 'year') return String(d.getFullYear());
+    return `${d.getFullYear()}-${d.getMonth() + 1}`;
+}
+
+async function loadCompanionDashboardCharts() {
+    if (typeof Chart === 'undefined') return;
+    const range = document.getElementById('companion-chart-range')?.value || companionChartState.range || 'month';
+    companionChartState.range = range;
+    if (!companionChartState.payload) {
+        companionChartState.payload = await getJson('/api/companions/me/bookings');
+    }
+    const bookings = Array.isArray(companionChartState.payload) ? companionChartState.payload : [];
+    const buckets = buildCompanionBuckets(range);
+    const labels = buckets.map(b => b.label);
+    const bucketIndex = {};
+    buckets.forEach((b, i) => { bucketIndex[b.key] = i; });
+
+    const acceptedSeries = new Array(labels.length).fill(0);
+    const completedSeries = new Array(labels.length).fill(0);
+    const incomeSeries = new Array(labels.length).fill(0);
+    bookings.forEach((b) => {
+        const key = toCompanionBucketKey(b.bookingTime, range);
+        const idx = bucketIndex[key];
+        if (idx == null) return;
+        if (b.status === 'ACCEPTED' || b.status === 'IN_PROGRESS') acceptedSeries[idx] += 1;
+        if (b.status === 'COMPLETED') {
+            completedSeries[idx] += 1;
+            incomeSeries[idx] += Number(b.holdAmount || 0);
+        }
+    });
+
+    const bookingCtx = document.getElementById('companion-booking-chart');
+    if (bookingCtx) {
+        companionChartState.bookingChart?.destroy();
+        companionChartState.bookingChart = new Chart(bookingCtx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Đơn đang chạy/chấp nhận', data: acceptedSeries, backgroundColor: 'rgba(59,130,246,.7)' },
+                    { label: 'Đơn hoàn tất', data: completedSeries, backgroundColor: 'rgba(16,185,129,.7)' },
+                    { label: 'Doanh thu (VND)', data: incomeSeries, type: 'line', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.15)', yAxisID: 'y1', tension: 0.3 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, position: 'left' },
+                    y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+    }
+
+    const statusCounts = { PENDING: 0, ACCEPTED: 0, IN_PROGRESS: 0, COMPLETED: 0, REJECTED: 0, CANCELLED: 0 };
+    bookings.forEach((b) => {
+        if (statusCounts[b.status] != null) statusCounts[b.status] += 1;
+    });
+    const statusCtx = document.getElementById('companion-status-chart');
+    if (statusCtx) {
+        companionChartState.statusChart?.destroy();
+        companionChartState.statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'CANCELLED'],
+                datasets: [{
+                    data: [
+                        statusCounts.PENDING,
+                        statusCounts.ACCEPTED,
+                        statusCounts.IN_PROGRESS,
+                        statusCounts.COMPLETED,
+                        statusCounts.REJECTED,
+                        statusCounts.CANCELLED
+                    ],
+                    backgroundColor: ['#64748b', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#94a3b8']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+}
+
 async function sendJson(url, method, payload) {
     return getJson(url, {
         method,
@@ -132,45 +277,59 @@ async function updateOnlineStatus() {
 
 async function loadAvailabilities() {
     const rows = document.getElementById('availability-body');
-    const data = await getJson('/api/companions/me/availabilities');
+    const modeHint = document.getElementById('availability-mode-hint');
+    const profile = await getJson('/api/companions/me/profile');
+    const bookings = await getJson('/api/companions/me/bookings');
     rows.innerHTML = '';
-    if (!data.length) {
-        rows.innerHTML = '<tr><td colspan="4" class="text-muted">Chưa có khung giờ rảnh.</td></tr>';
+
+    if (modeHint) {
+        if (profile?.online || profile?.onlineStatus) {
+            modeHint.innerHTML = '<span class="badge text-bg-success me-2">ONLINE</span>Bạn đang online, hệ thống mặc định bạn rảnh toàn bộ ngoài các khung giờ bận bên dưới.';
+        } else {
+            modeHint.innerHTML = '<span class="badge text-bg-secondary me-2">OFFLINE</span>Bạn đang offline. Bật online để sẵn sàng nhận booking mới.';
+        }
+    }
+
+    const busyStatuses = new Set(['PENDING', 'ACCEPTED', 'IN_PROGRESS']);
+    const busySlots = (Array.isArray(bookings) ? bookings : [])
+        .filter((b) => busyStatuses.has(b.status))
+        .map((b) => {
+            const start = b.bookingTime ? new Date(b.bookingTime) : null;
+            const end = start ? new Date(start.getTime() + Number(b.duration || 0) * 60000) : null;
+            return {
+                id: b.id,
+                start,
+                end,
+                status: b.status,
+                customerName: b.customer?.fullName || b.customer?.username || `User #${b.customer?.id || '-'}`,
+                location: b.location || '-'
+            };
+        })
+        .filter((x) => x.start && x.end)
+        .sort((a, b) => a.start - b.start);
+
+    if (!busySlots.length) {
+        rows.innerHTML = '<tr><td colspan="4" class="text-muted">Hiện chưa có khung giờ bận nào.</td></tr>';
         return;
     }
-    data.forEach(slot => {
+
+    busySlots.forEach((slot) => {
+        const statusClass = slot.status === 'IN_PROGRESS'
+            ? 'text-bg-danger'
+            : (slot.status === 'ACCEPTED' ? 'text-bg-warning' : 'text-bg-secondary');
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${escapeHtml(fmtDateTime(slot.startTime))}</td>
-            <td>${escapeHtml(fmtDateTime(slot.endTime))}</td>
-            <td>${escapeHtml(slot.note || '')}</td>
-            <td class="text-end">
-                <button class="btn btn-sm btn-outline-danger" data-id="${slot.id}">Xóa</button>
-            </td>`;
-        tr.querySelector('button').addEventListener('click', async () => {
-            try {
-                await fetch(`/api/companions/me/availabilities/${slot.id}`, { method: 'DELETE' });
-                await loadAvailabilities();
-                showAlert('Đã xóa khung giờ rảnh.');
-            } catch (err) {
-                showAlert(`Không thể xóa: ${err.message}`, 'danger');
-            }
-        });
+            <td>${escapeHtml(fmtDateTime(slot.start))}</td>
+            <td>${escapeHtml(fmtDateTime(slot.end))}</td>
+            <td><span class="badge ${statusClass}">${escapeHtml(slot.status)}</span></td>
+            <td>Booking #${slot.id} - ${escapeHtml(slot.customerName)} (${escapeHtml(slot.location)})</td>`;
         rows.appendChild(tr);
     });
 }
 
 async function addAvailability(e) {
-    e.preventDefault();
-    const payload = {
-        startTime: document.getElementById('start-time').value,
-        endTime: document.getElementById('end-time').value,
-        note: document.getElementById('note').value.trim()
-    };
-    await sendJson('/api/companions/me/availabilities', 'POST', payload);
-    e.target.reset();
-    await loadAvailabilities();
-    showAlert('Đã thêm khung giờ rảnh.');
+    e?.preventDefault?.();
+    showAlert('Lịch rảnh đã chuyển sang chế độ tự động theo trạng thái online và booking.', 'info');
 }
 
 async function updateBookingStatus(bookingId, status) {
@@ -205,8 +364,10 @@ async function checkOutBooking(bookingId) {
 }
 
 async function sendSos(bookingId) {
-    const note = prompt('Nhập nội dung khẩn cấp (SOS):');
+    const noteInput = document.getElementById('sos-note-input');
+    const note = (noteInput?.value || '').trim();
     if (!note) {
+        showAlert('Vui lòng nhập nội dung SOS.', 'warning');
         return;
     }
     const loc = await getCurrentLocation();
@@ -215,7 +376,71 @@ async function sendSos(bookingId) {
         lat: loc.lat,
         lng: loc.lng
     });
+    const modalEl = document.getElementById('sos-modal');
+    const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+    modal?.hide();
+    if (noteInput) noteInput.value = '';
     showAlert(`Đã gửi SOS cho booking #${bookingId}.`, 'warning');
+}
+
+function ensureSosModal() {
+    let modalEl = document.getElementById('sos-modal');
+    if (modalEl) return modalEl;
+    modalEl = document.createElement('div');
+    modalEl.className = 'modal fade';
+    modalEl.id = 'sos-modal';
+    modalEl.tabIndex = -1;
+    modalEl.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-danger">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-octagon-fill me-2"></i>Kích hoạt SOS</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning py-2">
+                        SOS sẽ gửi cảnh báo ngay cho khách hàng và Admin.
+                    </div>
+                    <label class="form-label fw-semibold" for="sos-note-input">Nội dung khẩn cấp</label>
+                    <textarea id="sos-note-input" class="form-control" rows="3" placeholder="Mô tả nhanh tình huống hiện tại..." required></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button class="btn btn-danger" id="confirm-sos-btn"><i class="bi bi-broadcast-pin me-1"></i>Gửi SOS ngay</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modalEl);
+    return modalEl;
+}
+
+function openSosModal(booking) {
+    const bookingId = Number(booking?.id || 0);
+    if (!bookingId) {
+        showAlert('Không tìm thấy thông tin booking để gửi SOS.', 'danger');
+        return;
+    }
+    const modalEl = ensureSosModal();
+    const noteInput = modalEl.querySelector('#sos-note-input');
+    if (noteInput) {
+        const customer = booking?.customer?.fullName || booking?.customer?.username || `User #${booking?.customer?.id || '-'}`;
+        const bookingTime = fmtDateTime(booking?.bookingTime);
+        const location = booking?.location || '-';
+        noteInput.value = `SOS khẩn cấp tại booking #${bookingId}. Khách hàng: ${customer}. Thời gian: ${bookingTime}. Địa điểm: ${location}.`;
+    }
+    const confirmBtn = modalEl.querySelector('#confirm-sos-btn');
+    if (confirmBtn) {
+        confirmBtn.onclick = async () => {
+            try {
+                await sendSos(bookingId);
+            } catch (err) {
+                showAlert(`Không thể gửi SOS: ${err.message}`, 'danger');
+            }
+        };
+    }
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
 }
 
 async function rateUser(bookingId) {
@@ -245,6 +470,7 @@ async function loadBookings() {
         const canProcess = item.status === 'PENDING';
         const canCheckIn = item.status === 'ACCEPTED';
         const canCheckOut = item.status === 'IN_PROGRESS';
+        const canSos = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS';
         const canRateUser = item.status === 'COMPLETED' && !item.companionRatingForUser;
         const canChat = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS' || item.status === 'COMPLETED';
         tr.innerHTML = `
@@ -260,7 +486,7 @@ async function loadBookings() {
                 ${canCheckOut ? `<button class="btn btn-sm btn-outline-success me-2" data-action="checkout">Check-out</button>` : ''}
                 ${canRateUser ? `<button class="btn btn-sm btn-outline-secondary me-2" data-action="rate">Rate User</button>` : ''}
                 ${canChat ? `<a class="btn btn-sm btn-outline-dark me-2" href="/user/chat.html?bookingId=${item.id}">Chat/Call</a>` : ''}
-                <button class="btn btn-sm btn-outline-danger" data-action="sos">SOS</button>
+                ${canSos ? `<button class="btn btn-sm btn-danger" data-action="sos"><i class="bi bi-exclamation-octagon me-1"></i>SOS</button>` : ''}
             </td>`;
         if (canProcess) {
             tr.querySelector('[data-action="accept"]').addEventListener('click', () => updateBookingStatus(item.id, 'ACCEPTED'));
@@ -275,7 +501,7 @@ async function loadBookings() {
         if (canRateUser) {
             tr.querySelector('[data-action="rate"]').addEventListener('click', () => rateUser(item.id));
         }
-        tr.querySelector('[data-action="sos"]').addEventListener('click', () => sendSos(item.id));
+        tr.querySelector('[data-action="sos"]')?.addEventListener('click', () => openSosModal(item));
         rows.appendChild(tr);
     });
 }
@@ -400,15 +626,32 @@ async function loadWithdrawals() {
 async function createWithdrawal(e) {
     e.preventDefault();
     await sendJson('/api/companions/me/withdrawals', 'POST', {
-        amount: document.getElementById('withdraw-amount').value,
-        bankName: document.getElementById('bank-name').value.trim(),
-        bankAccountNumber: document.getElementById('bank-account-number').value.trim(),
-        accountHolderName: document.getElementById('account-holder-name').value.trim()
+        amount: document.getElementById('withdraw-amount').value
     });
     e.target.reset();
     await loadWithdrawals();
     await loadIncomeStats();
     showAlert('Đã tạo lệnh rút tiền.');
+}
+
+async function loadBankAccount() {
+    const data = await getJson('/api/companions/me/bank-account');
+    const bankName = document.getElementById('bank-name');
+    const bankAccountNumber = document.getElementById('bank-account-number');
+    const accountHolderName = document.getElementById('account-holder-name');
+    if (bankName) bankName.value = data.bankName || '';
+    if (bankAccountNumber) bankAccountNumber.value = data.bankAccountNumber || '';
+    if (accountHolderName) accountHolderName.value = data.accountHolderName || '';
+}
+
+async function saveBankAccount(e) {
+    e.preventDefault();
+    await sendJson('/api/companions/me/bank-account', 'PUT', {
+        bankName: document.getElementById('bank-name').value.trim(),
+        bankAccountNumber: document.getElementById('bank-account-number').value.trim(),
+        accountHolderName: document.getElementById('account-holder-name').value.trim()
+    });
+    showAlert('Đã lưu tài khoản ngân hàng nhận tiền.');
 }
 
 async function bootstrap() {
@@ -422,7 +665,17 @@ async function bootstrap() {
         if (authUserEl) {
             authUserEl.textContent = `Xin chào, ${auth.username}`;
         }
+        await pollCompanionRealtimeNotifications();
+        if (!companionRealtimeNotifState.timer) {
+            companionRealtimeNotifState.timer = setInterval(pollCompanionRealtimeNotifications, 4000);
+        }
         const page = document.body.dataset.page || 'companion-dashboard';
+        if (page === 'companion-dashboard') {
+            document.getElementById('companion-chart-range')?.addEventListener('change', async (e) => {
+                companionChartState.range = e.target.value;
+                await loadCompanionDashboardCharts();
+            });
+        }
 
         const profileForm = document.getElementById('profile-form');
         if (profileForm) {
@@ -478,10 +731,20 @@ async function bootstrap() {
                 }
             });
         }
+        const bankAccountForm = document.getElementById('bank-account-form');
+        if (bankAccountForm) {
+            bankAccountForm.addEventListener('submit', async (e) => {
+                try {
+                    await saveBankAccount(e);
+                } catch (err) {
+                    showAlert(`Không thể lưu tài khoản ngân hàng: ${err.message}`, 'danger');
+                }
+            });
+        }
 
         const tasks = [];
         if (page === 'companion-dashboard') {
-            tasks.push(loadBookingWorkflow(), loadIncomeStats());
+            tasks.push(loadBookingWorkflow(), loadIncomeStats(), loadCompanionDashboardCharts());
         }
         if (page === 'companion-profile') {
             tasks.push(loadProfile());
@@ -493,10 +756,13 @@ async function bootstrap() {
             tasks.push(loadBookings(), loadBookingWorkflow(), loadConsultations());
         }
         if (page === 'companion-finance') {
-            tasks.push(loadIncomeStats(), loadWithdrawals());
+            tasks.push(loadIncomeStats(), loadWithdrawals(), loadBankAccount());
         }
         if (page === 'companion-notifications') {
             tasks.push(loadCompanionNotifications());
+        }
+        if (page === 'companion-chat') {
+            tasks.push(initCompanionChatPage());
         }
         await Promise.all(tasks);
     } catch (_) {
@@ -517,6 +783,60 @@ function notifIcon(title) {
     if (t.includes('duyệt') || t.includes('companion') || t.includes('hồ sơ'))
         return { icon: 'bi-person-check-fill', bg: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' };
     return { icon: 'bi-bell-fill', bg: 'linear-gradient(135deg, #64748b, #94a3b8)' };
+}
+
+const companionRealtimeNotifState = {
+    initialized: false,
+    seenIds: new Set(),
+    timer: null
+};
+
+function getCompanionToastContainer() {
+    let box = document.getElementById('companion-realtime-toast-container');
+    if (box) return box;
+    box = document.createElement('div');
+    box.id = 'companion-realtime-toast-container';
+    box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:1080;display:flex;flex-direction:column;gap:8px;max-width:380px;';
+    document.body.appendChild(box);
+    return box;
+}
+
+function showCompanionNotificationToast(notification) {
+    const box = getCompanionToastContainer();
+    const item = document.createElement('div');
+    item.className = 'shadow rounded-3 border bg-white p-3';
+    item.innerHTML = `
+        <div class="fw-semibold mb-1"><i class="bi bi-bell-fill text-primary me-2"></i>${escapeHtml(notification.title || 'Thông báo mới')}</div>
+        <div class="small text-muted">${escapeHtml(notification.content || '')}</div>
+    `;
+    box.appendChild(item);
+    setTimeout(() => item.remove(), 4500);
+}
+
+function processRealtimeCompanionNotifications(list) {
+    const sorted = [...(Array.isArray(list) ? list : [])]
+        .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    if (!companionRealtimeNotifState.initialized) {
+        sorted.forEach(n => companionRealtimeNotifState.seenIds.add(Number(n.id)));
+        companionRealtimeNotifState.initialized = true;
+        return;
+    }
+    sorted.forEach((n) => {
+        const id = Number(n.id);
+        if (!companionRealtimeNotifState.seenIds.has(id)) {
+            companionRealtimeNotifState.seenIds.add(id);
+            showCompanionNotificationToast(n);
+        }
+    });
+}
+
+async function pollCompanionRealtimeNotifications() {
+    try {
+        const list = await getJson('/api/companion/notifications/me');
+        processRealtimeCompanionNotifications(list);
+    } catch (_) {
+        // keep silent for transient issues
+    }
 }
 
 async function loadCompanionNotifications() {
@@ -581,6 +901,139 @@ async function loadCompanionNotifications() {
     }
 
     await render();
+}
+
+async function initCompanionChatPage() {
+    const bookingIdText = document.getElementById('chat-booking-id-text');
+    const threadTitle = document.getElementById('chat-thread-title');
+    const threadListBox = document.getElementById('chat-thread-list');
+    let currentBookingId = Number(new URLSearchParams(window.location.search).get('bookingId') || 0);
+    let threads = [];
+
+    function updateThreadHeader() {
+        if (!bookingIdText || !threadTitle) return;
+        if (!currentBookingId) {
+            bookingIdText.textContent = '-';
+            threadTitle.textContent = 'Chưa chọn cuộc trò chuyện';
+            return;
+        }
+        const active = threads.find(t => t.bookingId === currentBookingId);
+        bookingIdText.textContent = String(currentBookingId);
+        threadTitle.textContent = active ? `Khách hàng: ${active.partnerName}` : `Booking #${currentBookingId}`;
+    }
+
+    async function loadChatThreads() {
+        const list = await getJson('/api/companions/me/bookings');
+        threads = (Array.isArray(list) ? list : [])
+            .filter(b => Number(b?.id || 0) > 0)
+            .map(b => ({
+                bookingId: Number(b.id),
+                partnerName: b.customer?.fullName || b.customer?.username || `User #${b.customer?.id || '-'}`,
+                status: b.status || '-',
+                bookingTime: b.bookingTime
+            }))
+            .sort((a, b) => (new Date(b.bookingTime || 0)).getTime() - (new Date(a.bookingTime || 0)).getTime());
+    }
+
+    function resolveBookingForChat() {
+        if (currentBookingId && threads.some(t => t.bookingId === currentBookingId)) {
+            return currentBookingId;
+        }
+        const preferred = threads.find(t => ['IN_PROGRESS', 'ACCEPTED', 'PENDING', 'COMPLETED'].includes(t.status));
+        return preferred ? preferred.bookingId : (threads[0]?.bookingId || 0);
+    }
+
+    function renderThreadList() {
+        if (!threadListBox) return;
+        if (!threads.length) {
+            threadListBox.innerHTML = '<div class="p-3 text-muted">Chưa có cuộc trò chuyện khả dụng.</div>';
+            return;
+        }
+        threadListBox.innerHTML = `<div class="list-group list-group-flush">${
+            threads.map(t => {
+                const active = t.bookingId === currentBookingId ? 'bg-light' : '';
+                return `<button type="button" class="list-group-item list-group-item-action border-0 border-bottom ${active} chat-thread-item" data-booking-id="${t.bookingId}">
+                        <div class="fw-semibold">${escapeHtml(t.partnerName)}</div>
+                        <div class="small text-muted">#${t.bookingId} • ${escapeHtml(t.status)}</div>
+                    </button>`;
+            }).join('')
+        }</div>`;
+        threadListBox.querySelectorAll('.chat-thread-item').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                currentBookingId = Number(btn.getAttribute('data-booking-id'));
+                updateThreadHeader();
+                renderThreadList();
+                await loadMessages();
+            });
+        });
+    }
+
+    async function loadMessages() {
+        const box = document.getElementById('chat-list');
+        if (!box) return;
+        if (!currentBookingId) {
+            box.innerHTML = '<div class="text-muted">Chưa có cuộc trò chuyện để hiển thị.</div>';
+            return;
+        }
+        let list = [];
+        try {
+            list = await getJson(`/api/chat/${currentBookingId}/messages`);
+        } catch (err) {
+            box.innerHTML = `<div class="text-danger">Không thể tải tin nhắn: ${escapeHtml(err.message || 'Lỗi không xác định')}</div>`;
+            return;
+        }
+        box.innerHTML = list.length ? list.map(m => `
+            <div class="mb-2">
+                <div class="small text-muted">${escapeHtml(m.sender?.username || 'Ẩn danh')} • ${escapeHtml(fmtDateTime(m.createdAt))}</div>
+                <div class="p-2 rounded border bg-white">${escapeHtml(m.content || '')}</div>
+            </div>
+        `).join('') : '<div class="text-muted">Chưa có tin nhắn.</div>';
+        box.scrollTop = box.scrollHeight;
+    }
+
+    document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentBookingId) {
+            showAlert('Không tìm thấy booking phù hợp để chat.', 'warning');
+            return;
+        }
+        const input = document.getElementById('chat-content');
+        const content = (input?.value || '').trim();
+        if (!content) return;
+        try {
+            await getJson(`/api/chat/${currentBookingId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            if (input) input.value = '';
+            await loadMessages();
+        } catch (err) {
+            showAlert(`Gửi tin nhắn thất bại: ${err.message}`, 'danger');
+        }
+    });
+
+    document.getElementById('call-btn')?.addEventListener('click', async () => {
+        if (!currentBookingId) {
+            showAlert('Vui lòng chọn cuộc trò chuyện trước.', 'warning');
+            return;
+        }
+        const box = document.getElementById('call-info');
+        if (!box) return;
+        try {
+            const info = await getJson(`/api/chat/${currentBookingId}/call`);
+            box.innerHTML = `<div class="alert alert-success mb-0">VoIP room: <strong>${escapeHtml(info.roomId)}</strong> | token: ${escapeHtml(info.token)}</div>`;
+        } catch (err) {
+            box.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message || 'Không thể lấy thông tin call')}</div>`;
+        }
+    });
+
+    await loadChatThreads();
+    currentBookingId = resolveBookingForChat();
+    updateThreadHeader();
+    renderThreadList();
+    await loadMessages();
+    setInterval(loadMessages, 3000);
 }
 
 document.getElementById('logout-btn').addEventListener('click', async (e) => {

@@ -81,6 +81,144 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
+const adminChartState = {
+    range: "month",
+    eventsChart: null,
+    sourceChart: null,
+    payload: null
+};
+
+function startOfWeek(date) {
+    const d = new Date(date);
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function buildAdminBuckets(range) {
+    const now = new Date();
+    const buckets = [];
+    if (range === "day") {
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            d.setHours(0, 0, 0, 0);
+            buckets.push({
+                key: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+                label: d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+            });
+        }
+    } else if (range === "week") {
+        const current = startOfWeek(now);
+        for (let i = 7; i >= 0; i--) {
+            const d = new Date(current);
+            d.setDate(d.getDate() - i * 7);
+            buckets.push({
+                key: `${d.getFullYear()}-W${Math.ceil((((d - new Date(d.getFullYear(), 0, 1)) / 86400000) + 1) / 7)}`,
+                label: `Tuần ${Math.ceil((((d - new Date(d.getFullYear(), 0, 1)) / 86400000) + 1) / 7)}`
+            });
+        }
+    } else if (range === "year") {
+        for (let i = 4; i >= 0; i--) {
+            const y = now.getFullYear() - i;
+            buckets.push({ key: String(y), label: String(y) });
+        }
+    } else {
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            buckets.push({
+                key: `${d.getFullYear()}-${d.getMonth() + 1}`,
+                label: d.toLocaleDateString("vi-VN", { month: "2-digit", year: "2-digit" })
+            });
+        }
+    }
+    return buckets;
+}
+
+function toAdminBucketKey(dateValue, range) {
+    const d = new Date(dateValue);
+    if (Number.isNaN(d.getTime())) return null;
+    if (range === "day") return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    if (range === "week") {
+        const s = startOfWeek(d);
+        return `${s.getFullYear()}-W${Math.ceil((((s - new Date(s.getFullYear(), 0, 1)) / 86400000) + 1) / 7)}`;
+    }
+    if (range === "year") return String(d.getFullYear());
+    return `${d.getFullYear()}-${d.getMonth() + 1}`;
+}
+
+function aggregateAdminSeries(items, dateGetter, range, bucketIndex) {
+    const arr = new Array(Object.keys(bucketIndex).length).fill(0);
+    (Array.isArray(items) ? items : []).forEach((it) => {
+        const key = toAdminBucketKey(dateGetter(it), range);
+        if (key != null && bucketIndex[key] != null) {
+            arr[bucketIndex[key]] += 1;
+        }
+    });
+    return arr;
+}
+
+const companionReviewState = {
+    activeId: null
+};
+
+function renderCompanionReviewDetail(item) {
+    const user = item?.user || {};
+    const toLink = (url) => {
+        if (!url) return '<span class="text-muted">Không có</span>';
+        return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+    };
+    return `
+        <div class="row g-3">
+            <div class="col-md-6"><div><strong>ID hồ sơ:</strong> ${item?.id ?? "-"}</div></div>
+            <div class="col-md-6"><div><strong>ID user:</strong> ${user?.id ?? "-"}</div></div>
+            <div class="col-md-6"><div><strong>Username:</strong> ${escapeHtml(user?.username || "-")}</div></div>
+            <div class="col-md-6"><div><strong>Email:</strong> ${escapeHtml(user?.email || "-")}</div></div>
+            <div class="col-md-6"><div><strong>Họ tên:</strong> ${escapeHtml(user?.fullName || "-")}</div></div>
+            <div class="col-md-6"><div><strong>Trạng thái:</strong> <span class="badge text-bg-warning">${escapeHtml(item?.status || "PENDING")}</span></div></div>
+            <div class="col-md-6"><div><strong>Dịch vụ:</strong> ${escapeHtml(item?.serviceType || "-")}</div></div>
+            <div class="col-md-6"><div><strong>Khu vực:</strong> ${escapeHtml(item?.area || "-")}</div></div>
+            <div class="col-md-6"><div><strong>Giới tính:</strong> ${escapeHtml(item?.gender || "-")}</div></div>
+            <div class="col-md-6"><div><strong>Hạng game:</strong> ${escapeHtml(item?.gameRank || "-")}</div></div>
+            <div class="col-12"><div><strong>Tiểu sử:</strong><div class="text-muted mt-1">${escapeHtml(item?.bio || "-")}</div></div></div>
+            <div class="col-12"><div><strong>Sở thích:</strong><div class="text-muted mt-1">${escapeHtml(item?.hobbies || "-")}</div></div></div>
+            <div class="col-12"><div><strong>Ngoại hình:</strong><div class="text-muted mt-1">${escapeHtml(item?.appearance || "-")}</div></div></div>
+            <div class="col-12"><div><strong>Lịch rảnh:</strong><div class="text-muted mt-1">${escapeHtml(item?.availability || "-")}</div></div></div>
+            <div class="col-md-4"><div><strong>Số CCCD/CMND:</strong> ${escapeHtml(item?.identityNumber || "-")}</div></div>
+            <div class="col-md-8"><div><strong>Ảnh CCCD:</strong> ${toLink(item?.identityImageUrl)}</div></div>
+            <div class="col-md-12"><div><strong>Ảnh chân dung:</strong> ${toLink(item?.portraitImageUrl)}</div></div>
+            <div class="col-md-12"><div><strong>Avatar:</strong> ${toLink(item?.avatarUrl)}</div></div>
+            <div class="col-md-12"><div><strong>Video giới thiệu:</strong> ${toLink(item?.introVideoUrl)}</div></div>
+        </div>
+    `;
+}
+
+function openCompanionReviewModal(item, tableBodyId) {
+    companionReviewState.activeId = item?.id ?? null;
+    const detailBox = document.getElementById("companion-review-detail");
+    if (detailBox) {
+        detailBox.innerHTML = renderCompanionReviewDetail(item);
+    }
+    const approveBtn = document.getElementById("companion-approve-btn");
+    const rejectBtn = document.getElementById("companion-reject-btn");
+    if (approveBtn) {
+        approveBtn.onclick = async () => {
+            if (!companionReviewState.activeId) return;
+            await moderateCompanion(companionReviewState.activeId, true, tableBodyId);
+            bootstrap.Modal.getInstance(document.getElementById("companion-review-modal"))?.hide();
+        };
+    }
+    if (rejectBtn) {
+        rejectBtn.onclick = async () => {
+            if (!companionReviewState.activeId) return;
+            await moderateCompanion(companionReviewState.activeId, false, tableBodyId);
+            bootstrap.Modal.getInstance(document.getElementById("companion-review-modal"))?.hide();
+        };
+    }
+    new bootstrap.Modal(document.getElementById("companion-review-modal")).show();
+}
+
 function buildUserActionButtons(userId) {
     const template = document.getElementById("user-actions-template");
     if (template?.content) {
@@ -137,6 +275,72 @@ async function loadDashboardStats() {
     if (cancelledEl) cancelledEl.textContent = String(stats.cancelledBookings ?? 0);
 }
 
+async function loadAdminDashboardCharts() {
+    if (typeof Chart === "undefined") return;
+    const rangeEl = document.getElementById("admin-chart-range");
+    const range = rangeEl?.value || adminChartState.range || "month";
+    adminChartState.range = range;
+
+    if (!adminChartState.payload) {
+        const [reviews, disputes, tx] = await Promise.all([
+            requestJson("/api/admin/moderation/reviews"),
+            requestJson("/api/admin/disputes"),
+            requestJson("/api/admin/transactions")
+        ]);
+        adminChartState.payload = {
+            reviews: Array.isArray(reviews) ? reviews : [],
+            disputes: Array.isArray(disputes) ? disputes : [],
+            withdrawals: Array.isArray(tx?.pendingWithdrawals) ? tx.pendingWithdrawals : []
+        };
+    }
+
+    const buckets = buildAdminBuckets(range);
+    const labels = buckets.map((b) => b.label);
+    const bucketIndex = {};
+    buckets.forEach((b, i) => { bucketIndex[b.key] = i; });
+
+    const reviewSeries = aggregateAdminSeries(adminChartState.payload.reviews, (x) => x.createdAt, range, bucketIndex);
+    const disputeSeries = aggregateAdminSeries(adminChartState.payload.disputes, (x) => x.createdAt, range, bucketIndex);
+    const withdrawalSeries = aggregateAdminSeries(adminChartState.payload.withdrawals, (x) => x.createdAt, range, bucketIndex);
+
+    const eventsCtx = document.getElementById("admin-events-chart");
+    if (eventsCtx) {
+        adminChartState.eventsChart?.destroy();
+        adminChartState.eventsChart = new Chart(eventsCtx, {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    { label: "Review mới", data: reviewSeries, borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,.15)", tension: 0.3, fill: true },
+                    { label: "Tranh chấp", data: disputeSeries, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,.12)", tension: 0.3, fill: true },
+                    { label: "Yêu cầu rút tiền", data: withdrawalSeries, borderColor: "#0ea5e9", backgroundColor: "rgba(14,165,233,.12)", tension: 0.3, fill: true }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    const sourceCtx = document.getElementById("admin-source-chart");
+    if (sourceCtx) {
+        adminChartState.sourceChart?.destroy();
+        adminChartState.sourceChart = new Chart(sourceCtx, {
+            type: "doughnut",
+            data: {
+                labels: ["Review", "Tranh chấp", "Rút tiền"],
+                datasets: [{
+                    data: [
+                        reviewSeries.reduce((a, b) => a + b, 0),
+                        disputeSeries.reduce((a, b) => a + b, 0),
+                        withdrawalSeries.reduce((a, b) => a + b, 0)
+                    ],
+                    backgroundColor: ["#8b5cf6", "#ef4444", "#0ea5e9"]
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+}
+
 async function loadPendingCompanions(tableBodyId) {
     const rows = document.getElementById(tableBodyId);
     if (!rows) {
@@ -152,25 +356,37 @@ async function loadPendingCompanions(tableBodyId) {
 
     data.forEach((item) => {
         const tr = document.createElement("tr");
+        const isModerationPage = tableBodyId === "moderation-pending-body";
+        const actionHtml = isModerationPage
+            ? `<button class="btn btn-sm btn-outline-primary" data-action="view-profile" data-id="${item.id}">Xem hồ sơ</button>`
+            : `<button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Cấp tích xanh</button>
+               <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Từ chối</button>`;
         tr.innerHTML = `
             <td>${item.id}</td>
             <td>${escapeHtml(item.user?.username || "")}</td>
             <td>${escapeHtml(item.bio || "")}</td>
             <td><span class="badge text-bg-warning">${escapeHtml(item.status || "PENDING")}</span></td>
-            <td>
-                <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Cấp tích xanh</button>
-                <button class="btn btn-sm btn-danger" data-action="reject" data-id="${item.id}">Từ chối</button>
-            </td>
+            <td>${actionHtml}</td>
         `;
         rows.appendChild(tr);
     });
 
-    rows.querySelectorAll('button[data-action="approve"]').forEach((btn) => {
-        btn.addEventListener("click", () => moderateCompanion(btn.dataset.id, true, tableBodyId));
-    });
-    rows.querySelectorAll('button[data-action="reject"]').forEach((btn) => {
-        btn.addEventListener("click", () => moderateCompanion(btn.dataset.id, false, tableBodyId));
-    });
+    if (tableBodyId === "moderation-pending-body") {
+        rows.querySelectorAll('button[data-action="view-profile"]').forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const item = data.find((x) => String(x.id) === String(btn.dataset.id));
+                if (!item) return;
+                openCompanionReviewModal(item, tableBodyId);
+            });
+        });
+    } else {
+        rows.querySelectorAll('button[data-action="approve"]').forEach((btn) => {
+            btn.addEventListener("click", () => moderateCompanion(btn.dataset.id, true, tableBodyId));
+        });
+        rows.querySelectorAll('button[data-action="reject"]').forEach((btn) => {
+            btn.addEventListener("click", () => moderateCompanion(btn.dataset.id, false, tableBodyId));
+        });
+    }
 }
 
 async function moderateCompanion(id, isApprove, tableBodyId) {
@@ -417,6 +633,94 @@ function fmtDateTimeAdmin(value) {
     return new Date(value).toLocaleString("vi-VN");
 }
 
+const adminRealtimeNotifState = {
+    initialized: false,
+    seenIds: new Set(),
+    timer: null
+};
+
+function getAdminToastContainer() {
+    let box = document.getElementById("admin-realtime-toast-container");
+    if (box) return box;
+    box = document.createElement("div");
+    box.id = "admin-realtime-toast-container";
+    box.style.cssText = "position:fixed;top:16px;right:16px;z-index:1085;display:flex;flex-direction:column;gap:8px;max-width:380px;";
+    document.body.appendChild(box);
+    return box;
+}
+
+function showAdminToast(notification) {
+    const box = getAdminToastContainer();
+    const item = document.createElement("div");
+    item.className = "shadow rounded-3 border bg-white p-3";
+    item.innerHTML = `
+        <div class="fw-semibold mb-1"><i class="bi bi-bell-fill text-primary me-2"></i>${escapeHtml(notification.title || "Thông báo mới")}</div>
+        <div class="small text-muted">${escapeHtml(notification.content || "")}</div>
+    `;
+    box.appendChild(item);
+    setTimeout(() => item.remove(), 5000);
+}
+
+function showAdminSosAlarm(notification) {
+    const old = document.getElementById("admin-sos-overlay");
+    if (old) old.remove();
+    const overlay = document.createElement("div");
+    overlay.id = "admin-sos-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;";
+    overlay.innerHTML = `
+        <div class="bg-white rounded-4 shadow p-4 text-center" style="max-width:560px;width:100%;border:4px solid #ef4444;animation:sos-pulse .9s infinite alternate;">
+            <div class="display-6 text-danger mb-2"><i class="bi bi-exclamation-octagon-fill"></i></div>
+            <h3 class="h4 fw-bold text-danger mb-2">CẢNH BÁO SOS KHẨN CẤP</h3>
+            <div class="fw-semibold mb-2">${escapeHtml(notification.title || "SOS")}</div>
+            <p class="text-muted mb-3">${escapeHtml(notification.content || "")}</p>
+            <button id="admin-sos-close-btn" class="btn btn-danger px-4">Đã nhận cảnh báo</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (!document.getElementById("admin-sos-style")) {
+        const style = document.createElement("style");
+        style.id = "admin-sos-style";
+        style.textContent = "@keyframes sos-pulse{from{transform:scale(1)}to{transform:scale(1.03)}}";
+        document.head.appendChild(style);
+    }
+    document.getElementById("admin-sos-close-btn")?.addEventListener("click", () => overlay.remove());
+}
+
+function isSosNotification(notification) {
+    const text = `${notification?.title || ""} ${notification?.content || ""}`.toLowerCase();
+    return text.includes("sos") || text.includes("khẩn") || text.includes("bao dong") || text.includes("báo động");
+}
+
+function processAdminRealtimeNotifications(list) {
+    const sorted = [...(Array.isArray(list) ? list : [])]
+        .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    if (!adminRealtimeNotifState.initialized) {
+        sorted.forEach((n) => adminRealtimeNotifState.seenIds.add(Number(n.id)));
+        adminRealtimeNotifState.initialized = true;
+        return;
+    }
+    sorted.forEach((n) => {
+        const id = Number(n.id);
+        if (!adminRealtimeNotifState.seenIds.has(id)) {
+            adminRealtimeNotifState.seenIds.add(id);
+            if (isSosNotification(n)) {
+                showAdminSosAlarm(n);
+            } else {
+                showAdminToast(n);
+            }
+        }
+    });
+}
+
+async function pollAdminRealtimeNotifications() {
+    try {
+        const list = await requestJson("/api/admin/notifications/me");
+        processAdminRealtimeNotifications(list);
+    } catch (_) {
+        // avoid blocking admin dashboard on transient errors
+    }
+}
+
 async function loadAdminNotifications() {
     const listBox = document.getElementById("notification-list");
     const countBadge = document.getElementById("unread-count");
@@ -488,6 +792,12 @@ function setupPageEvents() {
             clearAlert();
             await loadDashboardStats();
             await loadPendingCompanions("pending-body");
+            adminChartState.payload = null;
+            await loadAdminDashboardCharts();
+        });
+        document.getElementById("admin-chart-range")?.addEventListener("change", async (e) => {
+            adminChartState.range = e.target.value;
+            await loadAdminDashboardCharts();
         });
     }
     if (path.endsWith("/users.html")) {
@@ -520,11 +830,16 @@ function setupPageEvents() {
 async function bootstrapAdminPage() {
     bindLogout();
     setupPageEvents();
+    await pollAdminRealtimeNotifications();
+    if (!adminRealtimeNotifState.timer) {
+        adminRealtimeNotifState.timer = setInterval(pollAdminRealtimeNotifications, 4000);
+    }
 
     const path = window.location.pathname;
     if (path.endsWith("/dashboard.html")) {
         await loadDashboardStats();
         await loadPendingCompanions("pending-body");
+        await loadAdminDashboardCharts();
     } else if (path.endsWith("/users.html")) {
         await loadUsersPage();
     } else if (path.endsWith("/moderation.html")) {
