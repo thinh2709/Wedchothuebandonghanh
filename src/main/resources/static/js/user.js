@@ -45,22 +45,26 @@ function renderTopNav(auth) {
     const nav = document.getElementById("top-nav");
     if (!nav) return;
     const links = `
-        <a class="btn btn-link text-decoration-none" href="/user/index.html">Trang chủ</a>
-        <a class="btn btn-link text-decoration-none" href="/user/search.html">Tìm kiếm</a>
-        <a class="btn btn-link text-decoration-none" href="/user/booking.html">Đặt lịch</a>
-        <a class="btn btn-link text-decoration-none" href="/user/appointments.html">Lịch hẹn</a>
-        <a class="btn btn-link text-decoration-none" href="/user/chat.html?bookingId=">Chat/Call</a>
-        <a class="btn btn-link text-decoration-none" href="/user/wallet.html">Ví tiền</a>
-        <a class="btn btn-link text-decoration-none" href="/user/favorites.html">Yêu thích</a>
-        <a class="btn btn-link text-decoration-none" href="/user/review.html">Đánh giá</a>
-        <a class="btn btn-link text-decoration-none" href="/user/report.html">Tố cáo</a>
-        <a class="btn btn-link text-decoration-none position-relative" href="#" id="notification-link">Thông báo <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span></a>
+        <a class="btn btn-link text-decoration-none" href="/user/index.html"><i class="bi bi-house me-1"></i>Trang chủ</a>
+        <a class="btn btn-link text-decoration-none" href="/user/search.html"><i class="bi bi-search me-1"></i>Tìm kiếm</a>
+        <a class="btn btn-link text-decoration-none" href="/user/booking.html"><i class="bi bi-calendar-plus me-1"></i>Đặt lịch</a>
+        <a class="btn btn-link text-decoration-none" href="/user/appointments.html"><i class="bi bi-calendar-event me-1"></i>Lịch hẹn</a>
+        <a class="btn btn-link text-decoration-none" href="/user/chat.html?bookingId="><i class="bi bi-chat-dots me-1"></i>Chat</a>
+        <a class="btn btn-link text-decoration-none" href="/user/wallet.html"><i class="bi bi-wallet2 me-1"></i>Ví tiền</a>
+        <a class="btn btn-link text-decoration-none" href="/user/favorites.html"><i class="bi bi-heart me-1"></i>Yêu thích</a>
+        <a class="btn btn-link text-decoration-none" href="/user/review.html"><i class="bi bi-star me-1"></i>Đánh giá</a>
+        <a class="btn btn-link text-decoration-none" href="/user/report.html"><i class="bi bi-flag me-1"></i>Tố cáo</a>
+        <a class="btn btn-link text-decoration-none position-relative" href="#" id="notification-link"><i class="bi bi-bell me-1"></i>Thông báo <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span></a>
     `;
+    const companionDashboardBtn = auth.authenticated && auth.role === "COMPANION"
+        ? `<a class="btn btn-outline-primary btn-sm ms-2" href="/companion/dashboard.html"><i class="bi bi-grid-1x2 me-1"></i>Dashboard Companion</a>`
+        : "";
     const authPart = auth.authenticated
-        ? `<span class="navbar-text ms-2">Xin chào, <strong>${escapeHtml(auth.username)}</strong></span>
-           <button id="logout-btn" class="btn btn-outline-danger btn-sm ms-2">Đăng xuất</button>`
-        : `<a class="btn btn-outline-primary btn-sm ms-2" href="/user/login.html">Đăng nhập</a>
-           <a class="btn btn-primary btn-sm ms-2" href="/user/register.html">Đăng ký</a>`;
+        ? `<span class="navbar-text ms-2"><i class="bi bi-person-circle me-1"></i>Xin chào, <strong>${escapeHtml(auth.username)}</strong></span>
+           ${companionDashboardBtn}
+           <button id="logout-btn" class="btn btn-outline-danger btn-sm ms-2"><i class="bi bi-box-arrow-right me-1"></i>Đăng xuất</button>`
+        : `<a class="btn btn-outline-primary btn-sm ms-2" href="/user/login.html"><i class="bi bi-box-arrow-in-right me-1"></i>Đăng nhập</a>
+           <a class="btn btn-primary btn-sm ms-2" href="/user/register.html"><i class="bi bi-person-plus me-1"></i>Đăng ký</a>`;
     nav.innerHTML = `${links}${authPart}`;
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
@@ -74,18 +78,34 @@ function renderTopNav(auth) {
 function companionCard(companion) {
     const name = companion.user?.fullName || companion.user?.username || "Companion";
     const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chưa có đánh giá";
+    const onlineClass = companion.onlineStatus ? 'bg-success' : 'bg-secondary';
+    const onlineText = companion.onlineStatus ? 'Online' : 'Offline';
     return `
     <div class="col">
       <div class="card user-card h-100">
-        <div class="card-body">
-          <h5 class="card-title">${escapeHtml(name)} <span class="badge bg-warning text-dark small">${rating}</span></h5>
-          <p class="card-text mb-2"><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chưa có")}</p>
-          <p class="card-text mb-2"><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
-          <p class="card-text mb-2"><strong>Dich vu:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Khu vuc:</strong> ${escapeHtml(companion.area || "-")}</p>
-          <p class="card-text mb-3"><strong>Gia:</strong> ${Number(companion.pricePerHour || 0).toLocaleString("vi-VN")} VND/h | <strong>Online:</strong> ${companion.onlineStatus ? "Yes" : "No"}</p>
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:48px;height:48px;background:linear-gradient(135deg,#6366f1,#8b5cf6);">
+              <i class="bi bi-person-fill text-white" style="font-size:1.3rem;"></i>
+            </div>
+            <div>
+              <h5 class="card-title mb-0 fw-bold">${escapeHtml(name)}</h5>
+              <div class="d-flex align-items-center gap-2 mt-1">
+                <span class="badge bg-warning text-dark" style="font-size:0.75rem;">${rating}</span>
+                <span class="badge ${onlineClass}" style="font-size:0.7rem;"><i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>${onlineText}</span>
+              </div>
+            </div>
+          </div>
+          <p class="card-text text-muted small mb-2"><i class="bi bi-chat-quote me-1"></i>${escapeHtml(companion.bio || "Chưa có mô tả")}</p>
+          <p class="card-text text-muted small mb-2"><i class="bi bi-heart me-1"></i>${escapeHtml(companion.hobbies || "Chưa có sở thích")}</p>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <span class="badge bg-light text-dark border"><i class="bi bi-grid me-1"></i>${escapeHtml(companion.serviceType || "-")}</span>
+            <span class="badge bg-light text-dark border"><i class="bi bi-geo-alt me-1"></i>${escapeHtml(companion.area || "-")}</span>
+            <span class="badge bg-light text-dark border"><i class="bi bi-cash me-1"></i>${Number(companion.pricePerHour || 0).toLocaleString("vi-VN")} VND/h</span>
+          </div>
           <div class="d-grid gap-2">
-            <a class="btn btn-outline-primary btn-sm" href="/user/profile.html?id=${companion.id}">Xem profile</a>
-            <a class="btn btn-primary btn-sm" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
+            <a class="btn btn-outline-primary btn-sm" href="/user/profile.html?id=${companion.id}"><i class="bi bi-person-lines-fill me-1"></i>Xem profile</a>
+            <a class="btn btn-primary btn-sm" href="/user/booking.html?id=${companion.id}"><i class="bi bi-calendar-plus me-1"></i>Đặt lịch</a>
           </div>
         </div>
       </div>
@@ -155,15 +175,15 @@ async function initProfilePage(auth) {
           <p><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
           <p><strong>Ngoại hình:</strong> ${escapeHtml(companion.appearance || "Chưa có")}</p>
           <p><strong>Thời gian rảnh:</strong> ${escapeHtml(companion.availability || "Chưa có")}</p>
-          <p><strong>Dich vu:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Rank:</strong> ${escapeHtml(companion.gameRank || "-")}</p>
-          <p><strong>Khu vuc:</strong> ${escapeHtml(companion.area || "-")} | <strong>Gioi tinh:</strong> ${escapeHtml(companion.gender || "-")}</p>
-          <p><strong>Ty le phan hoi:</strong> ${Number(companion.responseRate || 0).toFixed(0)}%</p>
-          ${companion.introVideoUrl ? `<a class="btn btn-sm btn-outline-dark mb-3" href="${escapeHtml(companion.introVideoUrl)}" target="_blank">Xem video gioi thieu</a>` : ""}
+          <p><strong>Dịch vụ:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Rank:</strong> ${escapeHtml(companion.gameRank || "-")}</p>
+          <p><strong>Khu vực:</strong> ${escapeHtml(companion.area || "-")} | <strong>Giới tính:</strong> ${escapeHtml(companion.gender || "-")}</p>
+          <p><strong>Tỷ lệ phản hồi:</strong> ${Number(companion.responseRate || 0).toFixed(0)}%</p>
+          ${companion.introVideoUrl ? `<a class="btn btn-sm btn-outline-dark mb-3" href="${escapeHtml(companion.introVideoUrl)}" target="_blank">Xem video giới thiệu</a>` : ""}
           <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-primary" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
             <a class="btn btn-outline-secondary" href="/user/review.html">Đánh giá</a>
             <a class="btn btn-outline-warning" href="/user/report.html?reportedUserId=${companion.user?.id || ""}">Tố cáo / SOS</a>
-            ${auth.authenticated ? `<button id="add-favorite-btn" class="btn btn-outline-danger">Them yeu thich</button>` : ""}
+            ${auth.authenticated ? `<button id="add-favorite-btn" class="btn btn-outline-danger">Thêm yêu thích</button>` : ""}
           </div>
           <div id="profile-message" class="mt-3"></div>
         </div></div>`;
@@ -172,7 +192,7 @@ async function initProfilePage(auth) {
         addBtn.addEventListener("click", async () => {
             const response = await apiFetch(`/api/favorites/${companion.id}`, { method: "POST", headers: {} });
             if (response.ok) {
-                setMessage("profile-message", "success", "Da them vao yeu thich");
+                setMessage("profile-message", "success", "Đã thêm vào yêu thích");
             } else {
                 setMessage("profile-message", "danger", "Thêm yêu thích thất bại");
             }
@@ -225,19 +245,19 @@ async function initAppointmentsPage(auth) {
         <div class="row">
           <div class="col-md-6"><strong>Thời gian:</strong> ${escapeHtml(formatDateTime(b.bookingTime))}</div>
           <div class="col-md-6"><strong>Thời lượng:</strong> ${escapeHtml(b.duration)} phút</div>
-          <div class="col-md-6"><strong>Tien coc:</strong> ${escapeHtml(Number(b.holdAmount || 0).toLocaleString("vi-VN"))} VND</div>
+          <div class="col-md-6"><strong>Tiền cọc:</strong> ${escapeHtml(Number(b.holdAmount || 0).toLocaleString("vi-VN"))} VND</div>
           <div class="col-md-6"><strong>Địa điểm:</strong> ${escapeHtml(b.location || "-")}</div>
           <div class="col-md-6"><strong>Trạng thái:</strong> ${escapeHtml(b.status || "-")}</div>
           <div class="col-12 mt-2"><strong>Ghi chú:</strong> ${escapeHtml(b.note || "-")}</div>
         </div>
         <div class="d-flex gap-2 mt-3">
-          ${b.status === "PENDING" || b.status === "ACCEPTED" ? `<button class="btn btn-outline-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel">Huy don</button>` : ""}
+          ${b.status === "PENDING" || b.status === "ACCEPTED" ? `<button class="btn btn-outline-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel">Hủy đơn</button>` : ""}
           ${b.status === "ACCEPTED" ? `<button class="btn btn-outline-primary btn-sm booking-action" data-id="${b.id}" data-action="check-in">Check-in</button>` : ""}
           ${b.status === "IN_PROGRESS" ? `<button class="btn btn-success btn-sm booking-action" data-id="${b.id}" data-action="check-out">Check-out</button>` : ""}
-          ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<button class="btn btn-outline-secondary btn-sm booking-action" data-id="${b.id}" data-action="extend">Gia han 30p</button>` : ""}
+          ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<button class="btn btn-outline-secondary btn-sm booking-action" data-id="${b.id}" data-action="extend">Gia hạn 30p</button>` : ""}
           ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<a class="btn btn-outline-dark btn-sm" href="/user/chat.html?bookingId=${b.id}">Chat/Call</a>` : ""}
         </div>
-      </div></div>`).join("") : `<div class="empty-state">Ban chua co lich hen nao.</div>`;
+      </div></div>`).join("") : `<div class="empty-state">Bạn chưa có lịch hẹn nào.</div>`;
 
     box.querySelectorAll(".booking-action").forEach((btn) => {
         btn.addEventListener("click", async () => {
@@ -268,11 +288,10 @@ async function initFavoritesPage(auth) {
             <div><h5 class="mb-1">${escapeHtml(name)}</h5><div class="text-muted">${escapeHtml(c.bio || "")}</div></div>
             <div class="d-flex gap-2">
                 <a href="/user/profile.html?id=${c.id}" class="btn btn-outline-primary btn-sm">Xem</a>
-                <button class="btn btn-outline-danger btn-sm remove-favorite" data-id="${c.id}">Xoa</button>
+                <button class="btn btn-outline-danger btn-sm remove-favorite" data-id="${c.id}">Xóa</button>
             </div>
         </div></div>`;
-    }).join("") : `<div class="empty-state">Danh sach yeu thich trong.</div>`;
-
+    }).join("") : `<div class="empty-state">Danh sách yêu thích trống.</div>`;
     box.querySelectorAll(".remove-favorite").forEach((btn) => {
         btn.addEventListener("click", async () => {
             const id = btn.getAttribute("data-id");
@@ -317,7 +336,7 @@ async function initReviewPage(auth) {
         e.preventDefault();
         const bookingId = Number(bookingSelect.value);
         if (!bookingId) {
-            setMessage("review-message", "warning", "Ban can co lich hen COMPLETED de danh gia.");
+            setMessage("review-message", "warning", "Bạn cần có lịch hẹn COMPLETED để đánh giá.");
             return;
         }
         const payload = {
@@ -347,7 +366,7 @@ async function initReviewPage(auth) {
               <div><strong>Booking #${r.booking?.id || "-"}</strong> - ${"★".repeat(r.rating || 0)}</div>
               <div class="text-muted small">${escapeHtml(formatDateTime(r.createdAt))}</div>
               <div>${escapeHtml(r.comment || "")}</div>
-            </div></div>`).join("") : `<div class="empty-state">Ban chua co danh gia nao.</div>`;
+            </div></div>`).join("") : `<div class="empty-state">Bạn chưa có đánh giá nào.</div>`;
     }
 
     await loadMyReviews();
@@ -386,10 +405,10 @@ async function initReportPage(auth) {
         box.innerHTML = reports.length ? reports.map((r) => `
             <div class="card user-card mb-2"><div class="card-body">
               <div><strong>Tố cáo user #${r.reportedUser?.id || "-"}</strong> - ${escapeHtml(r.status || "PENDING")}</div>
-              <div><strong>Loai:</strong> ${escapeHtml(r.category || "OTHER")} ${r.emergency ? '<span class="badge bg-danger">SOS</span>' : ''}</div>
+              <div><strong>Loại:</strong> ${escapeHtml(r.category || "OTHER")} ${r.emergency ? '<span class="badge bg-danger">SOS</span>' : ''}</div>
               <div class="text-muted small">${escapeHtml(formatDateTime(r.createdAt))}</div>
               <div>${escapeHtml(r.reason || "")}</div>
-            </div></div>`).join("") : `<div class="empty-state">Ban chua gui to cao nao.</div>`;
+            </div></div>`).join("") : `<div class="empty-state">Bạn chưa gửi tố cáo nào.</div>`;
     }
 
     await loadMyReports();
@@ -545,16 +564,93 @@ async function refreshNotifications() {
     const link = document.getElementById("notification-link");
     const badge = document.getElementById("notification-badge");
     if (!link || !badge) return;
-    const res = await apiFetch("/api/notifications/me", { headers: {} });
+    const res = await apiFetch("/api/user/notifications/me", { headers: {} });
     if (!res.ok) return;
     const list = await res.json();
     const unread = list.filter((n) => !n.isRead).length;
     badge.textContent = String(unread);
     badge.classList.toggle("d-none", unread <= 0);
-    link.onclick = (e) => {
-        e.preventDefault();
-        alert(list.slice(0, 10).map((n) => `- ${n.title}: ${n.content}`).join("\n") || "Không có thông báo");
-    };
+    link.href = "/user/notifications.html";
+    link.onclick = null;
+}
+
+function notifIcon(title) {
+    const t = (title || "").toLowerCase();
+    if (t.includes("booking") || t.includes("đặt lịch") || t.includes("lịch hẹn"))
+        return { icon: "bi-calendar-event-fill", bg: "linear-gradient(135deg, #3b82f6, #6366f1)" };
+    if (t.includes("thanh toán") || t.includes("tiền") || t.includes("nạp") || t.includes("wallet"))
+        return { icon: "bi-wallet2", bg: "linear-gradient(135deg, #10b981, #059669)" };
+    if (t.includes("đánh giá") || t.includes("review"))
+        return { icon: "bi-star-fill", bg: "linear-gradient(135deg, #f59e0b, #f97316)" };
+    if (t.includes("báo cáo") || t.includes("report") || t.includes("sos") || t.includes("cảnh cáo"))
+        return { icon: "bi-exclamation-triangle-fill", bg: "linear-gradient(135deg, #ef4444, #dc2626)" };
+    if (t.includes("duyệt") || t.includes("companion"))
+        return { icon: "bi-person-check-fill", bg: "linear-gradient(135deg, #8b5cf6, #a78bfa)" };
+    return { icon: "bi-bell-fill", bg: "linear-gradient(135deg, #64748b, #94a3b8)" };
+}
+
+async function initNotificationsPage(auth) {
+    if (!requireLogin(auth)) return;
+    const listBox = document.getElementById("notification-list");
+    const countBadge = document.getElementById("unread-count");
+    const markAllBtn = document.getElementById("mark-all-read-btn");
+
+    async function loadNotifications() {
+        const res = await apiFetch("/api/user/notifications/me", { headers: {} });
+        const list = res.ok ? await res.json() : [];
+        const unread = list.filter((n) => !n.isRead).length;
+        countBadge.textContent = `${unread} chưa đọc`;
+
+        if (!list.length) {
+            listBox.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3 mb-0">Bạn chưa có thông báo nào</p>
+                </div>`;
+            return;
+        }
+
+        listBox.innerHTML = list.map((n) => {
+            const ic = notifIcon(n.title);
+            const timeStr = formatDateTime(n.createdAt);
+            return `
+            <div class="notif-item d-flex gap-3 align-items-start ${n.isRead ? '' : 'unread'}" data-id="${n.id}" data-read="${n.isRead}">
+                <div class="notif-icon text-white" style="background: ${ic.bg};">
+                    <i class="bi ${ic.icon}"></i>
+                </div>
+                <div class="flex-grow-1 min-width-0">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="notif-title">${escapeHtml(n.title)}</div>
+                        ${!n.isRead ? '<span class="notif-dot ms-2 mt-2"></span>' : ''}
+                    </div>
+                    <div class="text-muted small mt-1">${escapeHtml(n.content)}</div>
+                    <div class="notif-time mt-1"><i class="bi bi-clock me-1"></i>${timeStr}</div>
+                </div>
+            </div>`;
+        }).join("");
+
+        listBox.querySelectorAll(".notif-item[data-read='false']").forEach((item) => {
+            item.addEventListener("click", async () => {
+                const id = item.getAttribute("data-id");
+                await apiFetch(`/api/user/notifications/${id}/read`, { method: "PATCH", headers: {} });
+                item.classList.remove("unread");
+                item.setAttribute("data-read", "true");
+                const dot = item.querySelector(".notif-dot");
+                if (dot) dot.remove();
+                const res2 = await apiFetch("/api/user/notifications/me", { headers: {} });
+                const list2 = res2.ok ? await res2.json() : [];
+                const unread2 = list2.filter((nn) => !nn.isRead).length;
+                countBadge.textContent = `${unread2} chưa đọc`;
+            });
+        });
+    }
+
+    markAllBtn?.addEventListener("click", async () => {
+        await apiFetch("/api/user/notifications/read-all", { method: "PATCH", headers: {} });
+        await loadNotifications();
+    });
+
+    await loadNotifications();
 }
 
 async function initWalletPage(auth) {
@@ -664,6 +760,7 @@ async function bootstrap() {
     if (page === "report") await initReportPage(auth);
     if (page === "wallet") await initWalletPage(auth);
     if (page === "chat") await initChatPage(auth);
+    if (page === "notifications") await initNotificationsPage(auth);
 }
 
 document.addEventListener("DOMContentLoaded", bootstrap);

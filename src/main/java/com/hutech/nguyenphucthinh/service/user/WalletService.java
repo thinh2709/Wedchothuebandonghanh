@@ -20,12 +20,12 @@ public class WalletService {
     private WalletTransactionRepository walletTransactionRepository;
 
     public User getUser(Long userId) {
-        return userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        return userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
     }
 
     public User deposit(Long userId, BigDecimal amount, String provider) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RuntimeException("Deposit amount must be greater than 0");
+            throw new RuntimeException("Số tiền nạp phải lớn hơn 0");
         }
         User user = getUser(userId);
         user.setBalance(user.getBalance().add(amount));
@@ -85,7 +85,7 @@ public class WalletService {
         tx.setAmount(amount.negate());
         tx.setType(WalletTransaction.Type.CHARGE);
         tx.setProvider("SYSTEM");
-        tx.setDescription("Thanh toán booking");
+        tx.setDescription("Thanh toán đơn đặt lịch");
         walletTransactionRepository.save(tx);
     }
 

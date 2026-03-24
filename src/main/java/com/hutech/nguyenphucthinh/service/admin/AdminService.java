@@ -117,19 +117,19 @@ public class AdminService {
     public Map<String, Object> warnUser(Long userId) {
         userRepository.findById(userId).orElseThrow();
         userFlags.put(userId, "WARNED");
-        return Map.of("message", "Da canh cao nguoi dung", "userId", userId, "flag", "WARNED");
+        return Map.of("message", "Đã cảnh cáo người dùng", "userId", userId, "flag", "WARNED");
     }
 
     public Map<String, Object> banUser(Long userId) {
         userRepository.findById(userId).orElseThrow();
         userFlags.put(userId, "BANNED");
-        return Map.of("message", "Da khoa tai khoan", "userId", userId, "flag", "BANNED");
+        return Map.of("message", "Đã khóa tài khoản", "userId", userId, "flag", "BANNED");
     }
 
     public Map<String, Object> resetUserStatus(Long userId) {
         userRepository.findById(userId).orElseThrow();
         userFlags.remove(userId);
-        return Map.of("message", "Da khoi phuc trang thai binh thuong", "userId", userId, "flag", "NONE");
+        return Map.of("message", "Đã khôi phục trạng thái bình thường", "userId", userId, "flag", "NONE");
     }
 
     public List<Map<String, Object>> getReviewsForModeration() {
@@ -155,10 +155,10 @@ public class AdminService {
     public Map<String, Object> hideReview(Long reviewId) {
         Review review = entityManager.find(Review.class, reviewId);
         if (review == null) {
-            throw new RuntimeException("Review not found");
+            throw new RuntimeException("Không tìm thấy đánh giá");
         }
         hiddenReviewIds.add(reviewId);
-        return Map.of("message", "Da an danh gia vi pham", "reviewId", reviewId, "hidden", true);
+        return Map.of("message", "Đã ẩn đánh giá vi phạm", "reviewId", reviewId, "hidden", true);
     }
 
     public Map<String, Object> getTransactionManagementData() {
@@ -177,7 +177,7 @@ public class AdminService {
                     withdrawal.getCompanion() != null
                             && withdrawal.getCompanion().getUser() != null
                             ? withdrawal.getCompanion().getUser().getUsername()
-                            : "Unknown"
+                            : "Không xác định"
             );
             withdrawals.add(item);
         }
@@ -186,30 +186,30 @@ public class AdminService {
 
     public Map<String, Object> updateCommissionRate(BigDecimal rate) {
         if (rate == null || rate.compareTo(BigDecimal.ZERO) < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
-            throw new RuntimeException("Commission rate must be between 0 and 1");
+            throw new RuntimeException("Commission rate phải nằm trong khoảng 0 đến 1");
         }
         commissionRate = rate.setScale(4, RoundingMode.HALF_UP);
-        return Map.of("message", "Da cap nhat commission rate", "commissionRate", commissionRate);
+        return Map.of("message", "Đã cập nhật commission rate", "commissionRate", commissionRate);
     }
 
     public Map<String, Object> approveWithdrawal(Long withdrawalId) {
         Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId).orElseThrow();
         if (withdrawal.getStatus() != Withdrawal.Status.PENDING) {
-            throw new RuntimeException("Chi duyet duoc lenh rut tien dang cho");
+            throw new RuntimeException("Chỉ duyệt được lệnh rút tiền đang chờ");
         }
         withdrawal.setStatus(Withdrawal.Status.APPROVED);
         withdrawalRepository.save(withdrawal);
-        return Map.of("message", "Da duyet lenh rut tien", "withdrawalId", withdrawalId, "status", withdrawal.getStatus());
+        return Map.of("message", "Đã duyệt lệnh rút tiền", "withdrawalId", withdrawalId, "status", withdrawal.getStatus());
     }
 
     public Map<String, Object> rejectWithdrawal(Long withdrawalId) {
         Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId).orElseThrow();
         if (withdrawal.getStatus() != Withdrawal.Status.PENDING) {
-            throw new RuntimeException("Chi tu choi duoc lenh rut tien dang cho");
+            throw new RuntimeException("Chỉ từ chối được lệnh rút tiền đang chờ");
         }
         withdrawal.setStatus(Withdrawal.Status.REJECTED);
         withdrawalRepository.save(withdrawal);
-        return Map.of("message", "Da tu choi lenh rut tien", "withdrawalId", withdrawalId, "status", withdrawal.getStatus());
+        return Map.of("message", "Đã từ chối lệnh rút tiền", "withdrawalId", withdrawalId, "status", withdrawal.getStatus());
     }
 
     public List<Map<String, Object>> getDisputes() {
@@ -236,7 +236,7 @@ public class AdminService {
     public Map<String, Object> freezeEscrow(Long reportId) {
         validateReportExists(reportId);
         disputeActions.put(reportId, "ESCROW_FROZEN");
-        return Map.of("message", "Da dong bang tien coc", "reportId", reportId, "action", "ESCROW_FROZEN");
+        return Map.of("message", "Đã đóng băng tiền cọc", "reportId", reportId, "action", "ESCROW_FROZEN");
     }
 
     public Map<String, Object> refundToUser(Long reportId) {
@@ -244,7 +244,7 @@ public class AdminService {
         report.setStatus(Report.Status.RESOLVED);
         entityManager.merge(report);
         disputeActions.put(reportId, "REFUND_TO_USER");
-        return Map.of("message", "Da hoan tien cho User", "reportId", reportId, "action", "REFUND_TO_USER");
+        return Map.of("message", "Đã hoàn tiền cho người dùng", "reportId", reportId, "action", "REFUND_TO_USER");
     }
 
     public Map<String, Object> payoutToCompanion(Long reportId) {
@@ -252,7 +252,7 @@ public class AdminService {
         report.setStatus(Report.Status.RESOLVED);
         entityManager.merge(report);
         disputeActions.put(reportId, "PAYOUT_TO_COMPANION");
-        return Map.of("message", "Da tra tien cho Companion", "reportId", reportId, "action", "PAYOUT_TO_COMPANION");
+        return Map.of("message", "Đã trả tiền cho companion", "reportId", reportId, "action", "PAYOUT_TO_COMPANION");
     }
 
     public Map<String, Object> closeDispute(Long reportId) {
@@ -260,13 +260,13 @@ public class AdminService {
         report.setStatus(Report.Status.RESOLVED);
         entityManager.merge(report);
         disputeActions.put(reportId, "CLOSED");
-        return Map.of("message", "Da dong tranh chap", "reportId", reportId, "action", "CLOSED");
+        return Map.of("message", "Đã đóng tranh chấp", "reportId", reportId, "action", "CLOSED");
     }
 
     private Report validateReportExists(Long reportId) {
         Report report = entityManager.find(Report.class, reportId);
         if (report == null) {
-            throw new RuntimeException("Report not found");
+            throw new RuntimeException("Không tìm thấy tố cáo");
         }
         return report;
     }

@@ -45,11 +45,11 @@ public class BookingService {
 
     public Booking createBooking(Long customerId, Long companionId, String bookingTime, Integer duration, String location, String note) {
         User customer = userRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng"));
         Companion companion = companionRepository.findById(companionId)
-                .orElseThrow(() -> new RuntimeException("Companion not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy companion"));
         if (duration == null || duration < 30) {
-            throw new RuntimeException("Duration must be at least 30 minutes");
+            throw new RuntimeException("Thời lượng tối thiểu là 30 phút");
         }
 
         Booking booking = new Booking();
@@ -70,15 +70,15 @@ public class BookingService {
 
     public Booking cancelBooking(Long customerId, Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCustomer().getId().equals(customerId)) {
-            throw new RuntimeException("No permission to cancel this booking");
+            throw new RuntimeException("Bạn không có quyền hủy đơn này");
         }
         if (booking.getStatus() == Booking.Status.COMPLETED || booking.getStatus() == Booking.Status.CANCELLED) {
-            throw new RuntimeException("Booking cannot be cancelled");
+            throw new RuntimeException("Đơn đặt lịch không thể hủy");
         }
         if (booking.getStatus() == Booking.Status.IN_PROGRESS) {
-            throw new RuntimeException("Booking dang dien ra, khong the huy");
+            throw new RuntimeException("Booking đang diễn ra, không thể hủy");
         }
         if (booking.getStatus() == Booking.Status.ACCEPTED) {
             BigDecimal refundAmount = calculateRefundAmount(booking);
@@ -89,8 +89,8 @@ public class BookingService {
         booking.setStatus(Booking.Status.CANCELLED);
         notificationService.create(
                 booking.getCustomer().getId(),
-                "Booking da huy",
-                "Don #" + booking.getId() + " da duoc huy theo chinh sach hoan tien."
+                "Booking đã hủy",
+                "Đơn #" + booking.getId() + " đã được hủy theo chính sách hoàn tiền."
         );
         return bookingRepository.save(booking);
     }
@@ -106,12 +106,12 @@ public class BookingService {
 
     public Booking checkIn(Long customerId, Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCustomer().getId().equals(customerId)) {
-            throw new RuntimeException("No permission to check-in this booking");
+            throw new RuntimeException("Bạn không có quyền check-in đơn này");
         }
         if (booking.getStatus() != Booking.Status.ACCEPTED) {
-            throw new RuntimeException("Booking must be ACCEPTED before check-in");
+            throw new RuntimeException("Đơn phải ở trạng thái ACCEPTED trước khi check-in");
         }
         booking.setStatus(Booking.Status.IN_PROGRESS);
         return bookingRepository.save(booking);
@@ -119,12 +119,12 @@ public class BookingService {
 
     public Booking checkOut(Long customerId, Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCustomer().getId().equals(customerId)) {
-            throw new RuntimeException("No permission to check-out this booking");
+            throw new RuntimeException("Bạn không có quyền check-out đơn này");
         }
         if (booking.getStatus() != Booking.Status.IN_PROGRESS) {
-            throw new RuntimeException("Booking must be IN_PROGRESS before check-out");
+            throw new RuntimeException("Đơn phải ở trạng thái IN_PROGRESS trước khi check-out");
         }
         booking.setStatus(Booking.Status.COMPLETED);
         Transaction tx = new Transaction();
@@ -135,23 +135,23 @@ public class BookingService {
         walletService.chargeForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
         notificationService.create(
                 booking.getCustomer().getId(),
-                "Booking hoan tat",
-                "Don #" + booking.getId() + " da ket thuc. Ban co the de lai danh gia."
+                "Booking hoàn tất",
+                "Đơn #" + booking.getId() + " đã kết thúc. Bạn có thể để lại đánh giá."
         );
         return bookingRepository.save(booking);
     }
 
     public Booking extendBooking(Long customerId, Long bookingId, Integer extraMinutes) {
         if (extraMinutes == null || extraMinutes < 30 || extraMinutes % 30 != 0) {
-            throw new RuntimeException("Gia han toi thieu 30 phut va buoc 30 phut");
+            throw new RuntimeException("Gia hạn tối thiểu 30 phút và bước 30 phút");
         }
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCustomer().getId().equals(customerId)) {
-            throw new RuntimeException("No permission to extend this booking");
+            throw new RuntimeException("Bạn không có quyền gia hạn đơn này");
         }
         if (booking.getStatus() != Booking.Status.ACCEPTED && booking.getStatus() != Booking.Status.IN_PROGRESS) {
-            throw new RuntimeException("Chi gia han khi booking ACCEPTED/IN_PROGRESS");
+            throw new RuntimeException("Chỉ gia hạn khi đơn ở trạng thái ACCEPTED/IN_PROGRESS");
         }
         BigDecimal extraHold = calculateHoldAmount(booking.getCompanion(), extraMinutes);
         walletService.holdForBooking(booking.getCustomer(), booking, extraHold);

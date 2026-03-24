@@ -24,11 +24,11 @@ public class ChatService {
     private UserRepository userRepository;
 
     private Booking getAuthorizedBooking(Long userId, Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         boolean isCustomer = booking.getCustomer().getId().equals(userId);
         boolean isCompanion = booking.getCompanion().getUser().getId().equals(userId);
         if (!isCustomer && !isCompanion) {
-            throw new RuntimeException("No permission for this booking");
+            throw new RuntimeException("Bạn không có quyền truy cập đơn đặt lịch này");
         }
         return booking;
     }
@@ -40,10 +40,10 @@ public class ChatService {
 
     public ChatMessage sendMessage(Long userId, Long bookingId, String content) {
         if (content == null || content.isBlank()) {
-            throw new RuntimeException("Message is required");
+            throw new RuntimeException("Nội dung tin nhắn là bắt buộc");
         }
         Booking booking = getAuthorizedBooking(userId, bookingId);
-        User sender = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        User sender = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
         ChatMessage msg = new ChatMessage();
         msg.setBooking(booking);
         msg.setSender(sender);
@@ -54,13 +54,11 @@ public class ChatService {
 
     public Map<String, Object> generateCallInfo(Long userId, Long bookingId) {
         Booking booking = getAuthorizedBooking(userId, bookingId);
-        if (booking.getStatus() != Booking.Status.ACCEPTED && booking.getStatus() != Booking.Status.IN_PROGRESS) {
-            throw new RuntimeException("Call is available when booking is ACCEPTED or IN_PROGRESS");
-        }
         Map<String, Object> payload = new HashMap<>();
         payload.put("roomId", "booking-room-" + bookingId);
         payload.put("token", "internal-demo-token-" + userId + "-" + bookingId);
         payload.put("provider", "INTERNAL_DEMO_VOIP");
+        payload.put("bookingStatus", booking.getStatus().name());
         return payload;
     }
 }

@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tố cáo - User</title>
+    <title>Tố cáo - Companion Rental</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/user.css">
 </head>
 <body data-page="report" class="bg-light">
 <nav class="navbar navbar-expand-lg bg-white border-bottom">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/user/index.html">Companion Rental</a>
+        <a class="navbar-brand fw-bold" href="/user/index.html"><i class="bi bi-heart-pulse-fill me-2"></i>Companion Rental</a>
         <div id="top-nav" class="app-nav d-flex align-items-center flex-wrap gap-1"></div>
     </div>
 </nav>
@@ -18,15 +19,23 @@
     <div class="row g-3">
         <div class="col-lg-6">
             <div class="card user-card">
-                <div class="card-body">
-                    <h1 class="h4 mb-3">Gửi tố cáo / khiếu nại</h1>
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width: 48px; height: 48px; background: linear-gradient(135deg, #ef4444, #dc2626);">
+                            <i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 1.2rem;"></i>
+                        </div>
+                        <div>
+                            <h1 class="h4 mb-0 fw-bold">Gửi tố cáo / khiếu nại</h1>
+                            <p class="text-muted small mb-0">Báo cáo hành vi vi phạm</p>
+                        </div>
+                    </div>
                     <form id="report-form" class="row g-3">
                         <div class="col-12">
-                            <label for="reportedUserId" class="form-label">ID user bị tố cáo</label>
-                            <input id="reportedUserId" type="number" min="1" class="form-control" required>
+                            <label for="reportedUserId" class="form-label"><i class="bi bi-person-x me-1"></i>ID user bị tố cáo</label>
+                            <input id="reportedUserId" type="number" min="1" class="form-control" placeholder="Nhập ID" required>
                         </div>
                         <div class="col-12">
-                            <label for="reportCategory" class="form-label">Loại vấn đề</label>
+                            <label for="reportCategory" class="form-label"><i class="bi bi-tag me-1"></i>Loại vấn đề</label>
                             <select id="reportCategory" class="form-select">
                                 <option value="FAKE_PROFILE">Không giống ảnh</option>
                                 <option value="LATE">Đi trễ</option>
@@ -36,15 +45,15 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label for="reason" class="form-label">Nội dung</label>
+                            <label for="reason" class="form-label"><i class="bi bi-pencil me-1"></i>Nội dung</label>
                             <textarea id="reason" rows="4" class="form-control" placeholder="Mô tả chi tiết sự việc..." required></textarea>
                         </div>
                         <div class="col-12 form-check ms-2">
                             <input id="isEmergency" class="form-check-input" type="checkbox">
-                            <label class="form-check-label" for="isEmergency">SOS khẩn cấp</label>
+                            <label class="form-check-label fw-semibold text-danger" for="isEmergency"><i class="bi bi-exclamation-octagon-fill me-1"></i>SOS khẩn cấp</label>
                         </div>
                         <div class="col-12 d-grid">
-                            <button class="btn btn-warning" type="submit">Gửi tố cáo</button>
+                            <button class="btn btn-warning" type="submit"><i class="bi bi-flag-fill me-1"></i>Gửi tố cáo</button>
                         </div>
                     </form>
                     <div id="report-message" class="mt-3"></div>
@@ -53,9 +62,14 @@
         </div>
         <div class="col-lg-6">
             <div class="card user-card">
-                <div class="card-body">
-                    <h2 class="h5 mb-3">Lịch sử tố cáo của bạn</h2>
-                    <div id="report-list"><p class="text-muted mb-0">Đang tải dữ liệu...</p></div>
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3 fw-bold"><i class="bi bi-list-check me-2"></i>Lịch sử tố cáo của bạn</h2>
+                    <div id="report-list">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                            <p class="text-muted mb-0">Đang tải dữ liệu...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

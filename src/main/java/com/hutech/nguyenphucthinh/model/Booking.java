@@ -40,6 +40,7 @@ public class Booking {
     private BigDecimal holdAmount = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private Status status = Status.PENDING;
 
     private LocalDateTime acceptedAt;

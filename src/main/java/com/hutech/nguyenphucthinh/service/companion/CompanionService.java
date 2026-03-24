@@ -6,6 +6,7 @@ import com.hutech.nguyenphucthinh.model.Consultation;
 import com.hutech.nguyenphucthinh.model.Companion;
 import com.hutech.nguyenphucthinh.model.ServicePrice;
 import com.hutech.nguyenphucthinh.model.User;
+import com.hutech.nguyenphucthinh.model.Transaction;
 import com.hutech.nguyenphucthinh.model.Withdrawal;
 import com.hutech.nguyenphucthinh.repository.BookingRepository;
 import com.hutech.nguyenphucthinh.repository.CompanionAvailabilityRepository;
@@ -81,13 +82,13 @@ public class CompanionService {
     public Companion registerCompanion(Long userId, String bio, String hobbies, String appearance, String availability,
                                        String serviceType, String area, String gender, String gameRank,
                                        Boolean onlineStatus, String avatarUrl, String introVideoUrl) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
         if (user.getRole() != User.Role.COMPANION) {
             user.setRole(User.Role.COMPANION);
             userRepository.save(user);
         }
         if (companionRepository.findByUserId(userId).isPresent()) {
-            throw new RuntimeException("Companion profile already exists");
+            throw new RuntimeException("Hồ sơ companion đã tồn tại");
         }
 
         Companion companion = new Companion();
@@ -108,7 +109,7 @@ public class CompanionService {
     }
 
     public Companion getCompanionByUserId(Long userId) {
-        return companionRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("Companion profile not found"));
+        return companionRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ companion"));
     }
 
     public Companion updateProfile(Long userId, String bio, String hobbies, String appearance, String availability,
@@ -172,7 +173,7 @@ public class CompanionService {
 
     public CompanionAvailability addAvailability(Long userId, LocalDateTime startTime, LocalDateTime endTime, String note) {
         if (endTime.isBefore(startTime) || endTime.isEqual(startTime)) {
-            throw new RuntimeException("Invalid availability range");
+            throw new RuntimeException("Khoảng thời gian rảnh không hợp lệ");
         }
         Companion companion = getCompanionByUserId(userId);
         CompanionAvailability slot = new CompanionAvailability();
@@ -186,9 +187,9 @@ public class CompanionService {
     public void removeAvailability(Long userId, Long availabilityId) {
         Companion companion = getCompanionByUserId(userId);
         CompanionAvailability slot = availabilityRepository.findById(availabilityId)
-                .orElseThrow(() -> new RuntimeException("Availability not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khung giờ rảnh"));
         if (!slot.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission to remove availability");
+            throw new RuntimeException("Bạn không có quyền xóa khung giờ rảnh này");
         }
         availabilityRepository.delete(slot);
     }
@@ -200,29 +201,29 @@ public class CompanionService {
 
     public Booking updateBookingStatus(Long userId, Long bookingId, Booking.Status status) {
         if (status != Booking.Status.ACCEPTED && status != Booking.Status.REJECTED) {
-            throw new RuntimeException("Only ACCEPTED/REJECTED status is allowed");
+            throw new RuntimeException("Chỉ cho phép trạng thái ACCEPTED/REJECTED");
         }
         Companion companion = getCompanionByUserId(userId);
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission to update this booking");
+            throw new RuntimeException("Bạn không có quyền cập nhật đơn này");
         }
         if (booking.getStatus() != Booking.Status.PENDING) {
-            throw new RuntimeException("Booking already processed");
+            throw new RuntimeException("Đơn đặt lịch đã được xử lý");
         }
         if (status == Booking.Status.ACCEPTED) {
             walletService.holdForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
             notificationService.create(
                     booking.getCustomer().getId(),
-                    "Booking duoc chap nhan",
-                    "Companion da chap nhan don #" + booking.getId() + ". Ban co the chat/call ngay."
+                    "Booking được chấp nhận",
+                    "Companion đã chấp nhận đơn #" + booking.getId() + ". Bạn có thể chat/call ngay."
             );
         }
         if (status == Booking.Status.REJECTED) {
             notificationService.create(
                     booking.getCustomer().getId(),
-                    "Booking bi tu choi",
-                    "Companion da tu choi don #" + booking.getId() + ". Ban hay dat lai voi companion khac."
+                    "Booking bị từ chối",
+                    "Companion đã từ chối đơn #" + booking.getId() + ". Bạn hãy đặt lại với companion khác."
             );
         }
         booking.setStatus(status);
@@ -247,12 +248,12 @@ public class CompanionService {
 
     public Booking checkIn(Long userId, Long bookingId, Double lat, Double lng) {
         Companion companion = getCompanionByUserId(userId);
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission");
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
         }
         if (booking.getStatus() != Booking.Status.ACCEPTED) {
-            throw new RuntimeException("Booking is not in ACCEPTED state");
+            throw new RuntimeException("Đơn không ở trạng thái ACCEPTED");
         }
         booking.setCheckInLatitude(lat);
         booking.setCheckInLongitude(lng);
@@ -263,25 +264,40 @@ public class CompanionService {
 
     public Booking checkOut(Long userId, Long bookingId, Double lat, Double lng) {
         Companion companion = getCompanionByUserId(userId);
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission");
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
         }
         if (booking.getStatus() != Booking.Status.IN_PROGRESS) {
-            throw new RuntimeException("Booking is not in IN_PROGRESS state");
+            throw new RuntimeException("Đơn không ở trạng thái IN_PROGRESS");
         }
         booking.setCheckOutLatitude(lat);
         booking.setCheckOutLongitude(lng);
         booking.setCompletedAt(LocalDateTime.now());
         booking.setStatus(Booking.Status.COMPLETED);
+
+        Transaction tx = new Transaction();
+        tx.setBooking(booking);
+        tx.setAmount(booking.getHoldAmount());
+        tx.setStatus(Transaction.Status.COMPLETED);
+        transactionRepository.save(tx);
+
+        walletService.chargeForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
+
+        notificationService.create(
+                booking.getCustomer().getId(),
+                "Booking hoàn tất",
+                "Đơn #" + booking.getId() + " đã kết thúc. Bạn có thể để lại đánh giá."
+        );
+
         return bookingRepository.save(booking);
     }
 
     public Booking triggerSos(Long userId, Long bookingId, String note, Double lat, Double lng) {
         Companion companion = getCompanionByUserId(userId);
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission");
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
         }
         booking.setSosTriggered(true);
         booking.setSosNote(note);
@@ -292,15 +308,15 @@ public class CompanionService {
 
     public Booking rateUser(Long userId, Long bookingId, Integer rating, String review) {
         if (rating == null || rating < 1 || rating > 5) {
-            throw new RuntimeException("Rating must be in range 1-5");
+            throw new RuntimeException("Điểm đánh giá phải trong khoảng 1-5");
         }
         Companion companion = getCompanionByUserId(userId);
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
         if (!booking.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission");
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
         }
         if (booking.getStatus() != Booking.Status.COMPLETED) {
-            throw new RuntimeException("Only completed bookings can be rated");
+            throw new RuntimeException("Chỉ đánh giá được đơn đã hoàn tất");
         }
         booking.setCompanionRatingForUser(rating);
         booking.setCompanionReviewForUser(review);
@@ -338,7 +354,7 @@ public class CompanionService {
 
     public ServicePrice addServicePrice(Long userId, String serviceName, BigDecimal pricePerHour, String description) {
         if (pricePerHour == null || pricePerHour.signum() <= 0) {
-            throw new RuntimeException("Price must be greater than 0");
+            throw new RuntimeException("Giá phải lớn hơn 0");
         }
         Companion companion = getCompanionByUserId(userId);
         ServicePrice item = new ServicePrice();
@@ -351,9 +367,9 @@ public class CompanionService {
 
     public void deleteServicePrice(Long userId, Long priceId) {
         Companion companion = getCompanionByUserId(userId);
-        ServicePrice item = servicePriceRepository.findById(priceId).orElseThrow(() -> new RuntimeException("Price item not found"));
+        ServicePrice item = servicePriceRepository.findById(priceId).orElseThrow(() -> new RuntimeException("Không tìm thấy mục giá"));
         if (!item.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission");
+            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
         }
         servicePriceRepository.delete(item);
     }
@@ -365,16 +381,16 @@ public class CompanionService {
 
     public Withdrawal createWithdrawal(Long userId, BigDecimal amount, String bankName, String bankAccountNumber, String accountHolderName) {
         if (amount == null || amount.signum() <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Withdraw amount must be greater than 0");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền rút phải lớn hơn 0");
         }
         if (bankName == null || bankName.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank name is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên ngân hàng là bắt buộc");
         }
         if (bankAccountNumber == null || bankAccountNumber.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account number is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tài khoản ngân hàng là bắt buộc");
         }
         if (accountHolderName == null || accountHolderName.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account holder name is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên chủ tài khoản là bắt buộc");
         }
         Companion companion = getCompanionByUserId(userId);
         BigDecimal available = transactionRepository.sumCompletedIncomeByCompanionId(companion.getId())
@@ -383,7 +399,7 @@ public class CompanionService {
             available = BigDecimal.ZERO;
         }
         if (amount.compareTo(available) > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient available balance");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số dư khả dụng không đủ");
         }
         Withdrawal withdrawal = new Withdrawal();
         withdrawal.setCompanion(companion);
@@ -403,9 +419,9 @@ public class CompanionService {
     public Consultation answerConsultation(Long userId, Long consultationId, String answer) {
         Companion companion = getCompanionByUserId(userId);
         Consultation consultation = consultationRepository.findById(consultationId)
-                .orElseThrow(() -> new RuntimeException("Consultation not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy câu hỏi tư vấn"));
         if (!consultation.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("No permission to answer this consultation");
+            throw new RuntimeException("Bạn không có quyền trả lời câu hỏi tư vấn này");
         }
         consultation.setAnswer(answer);
         consultation.setStatus(Consultation.Status.ANSWERED);
@@ -414,8 +430,8 @@ public class CompanionService {
     }
 
     public Consultation createConsultation(Long customerId, Long companionId, String question) {
-        User customer = userRepository.findById(customerId).orElseThrow(() -> new RuntimeException("Customer not found"));
-        Companion companion = companionRepository.findById(companionId).orElseThrow(() -> new RuntimeException("Companion not found"));
+        User customer = userRepository.findById(customerId).orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng"));
+        Companion companion = companionRepository.findById(companionId).orElseThrow(() -> new RuntimeException("Không tìm thấy companion"));
 
         Consultation consultation = new Consultation();
         consultation.setCustomer(customer);

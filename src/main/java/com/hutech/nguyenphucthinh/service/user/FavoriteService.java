@@ -25,9 +25,9 @@ public class FavoriteService {
         }
 
         User customer = userRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng"));
         Companion companion = companionRepository.findById(companionId)
-                .orElseThrow(() -> new RuntimeException("Companion not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy companion"));
 
         Favorite favorite = new Favorite();
         favorite.setCustomer(customer);

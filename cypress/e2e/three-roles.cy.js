@@ -11,8 +11,8 @@ describe('Nghiệp vụ E2E cho 3 vai trò', () => {
     password: Cypress.env('COMPANION_PASSWORD') || '123456',
   };
   const admin = {
-    username: Cypress.env('ADMIN_USERNAME') || '',
-    password: Cypress.env('ADMIN_PASSWORD') || '',
+    username: Cypress.env('ADMIN_USERNAME') || 'thinh270924@gmail.com',
+    password: Cypress.env('ADMIN_PASSWORD') || '123456',
   };
 
   const state = {

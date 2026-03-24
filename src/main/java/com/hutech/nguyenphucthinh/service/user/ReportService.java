@@ -19,16 +19,16 @@ public class ReportService {
 
     public Report createReport(Long reporterId, Long reportedUserId, String reason, String category, Boolean emergency) {
         if (reason == null || reason.isBlank()) {
-            throw new RuntimeException("Reason is required");
+            throw new RuntimeException("Lý do tố cáo là bắt buộc");
         }
 
         User reporter = userRepository.findById(reporterId)
-                .orElseThrow(() -> new RuntimeException("Reporter not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người tố cáo"));
         User reportedUser = userRepository.findById(reportedUserId)
-                .orElseThrow(() -> new RuntimeException("Reported user not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người bị tố cáo"));
 
         if (reporter.getId().equals(reportedUser.getId())) {
-            throw new RuntimeException("Cannot report yourself");
+            throw new RuntimeException("Bạn không thể tự tố cáo chính mình");
         }
 
         Report report = new Report();

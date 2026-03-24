@@ -19,19 +19,19 @@ public class ReviewService {
 
     public Review createReview(Long customerId, Long bookingId, Integer rating, String comment) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
 
         if (!booking.getCustomer().getId().equals(customerId)) {
-            throw new RuntimeException("You can only review your own bookings");
+            throw new RuntimeException("Bạn chỉ có thể đánh giá đơn của chính mình");
         }
         if (booking.getStatus() != Booking.Status.COMPLETED) {
-            throw new RuntimeException("Only completed bookings can be reviewed");
+            throw new RuntimeException("Chỉ đánh giá được đơn đã hoàn tất");
         }
         if (rating == null || rating < 1 || rating > 5) {
-            throw new RuntimeException("Rating must be from 1 to 5");
+            throw new RuntimeException("Điểm đánh giá phải từ 1 đến 5");
         }
         if (reviewRepository.findByBookingId(bookingId).isPresent()) {
-            throw new RuntimeException("This booking has already been reviewed");
+            throw new RuntimeException("Đơn này đã được đánh giá");
         }
 
         Review review = new Review();

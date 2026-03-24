@@ -418,7 +418,10 @@ async function bootstrap() {
             window.location.href = '/user/login.html';
             return;
         }
-        document.getElementById('auth-user').textContent = `Xin chào, ${auth.username}`;
+        const authUserEl = document.getElementById('auth-user');
+        if (authUserEl) {
+            authUserEl.textContent = `Xin chào, ${auth.username}`;
+        }
         const page = document.body.dataset.page || 'companion-dashboard';
 
         const profileForm = document.getElementById('profile-form');
@@ -492,10 +495,92 @@ async function bootstrap() {
         if (page === 'companion-finance') {
             tasks.push(loadIncomeStats(), loadWithdrawals());
         }
+        if (page === 'companion-notifications') {
+            tasks.push(loadCompanionNotifications());
+        }
         await Promise.all(tasks);
     } catch (_) {
         window.location.href = '/user/login.html';
     }
+}
+
+function notifIcon(title) {
+    const t = (title || '').toLowerCase();
+    if (t.includes('booking') || t.includes('đặt lịch') || t.includes('lịch hẹn'))
+        return { icon: 'bi-calendar-event-fill', bg: 'linear-gradient(135deg, #3b82f6, #6366f1)' };
+    if (t.includes('thanh toán') || t.includes('tiền') || t.includes('rút'))
+        return { icon: 'bi-wallet2', bg: 'linear-gradient(135deg, #10b981, #059669)' };
+    if (t.includes('đánh giá') || t.includes('review'))
+        return { icon: 'bi-star-fill', bg: 'linear-gradient(135deg, #f59e0b, #f97316)' };
+    if (t.includes('báo cáo') || t.includes('sos') || t.includes('cảnh cáo'))
+        return { icon: 'bi-exclamation-triangle-fill', bg: 'linear-gradient(135deg, #ef4444, #dc2626)' };
+    if (t.includes('duyệt') || t.includes('companion') || t.includes('hồ sơ'))
+        return { icon: 'bi-person-check-fill', bg: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' };
+    return { icon: 'bi-bell-fill', bg: 'linear-gradient(135deg, #64748b, #94a3b8)' };
+}
+
+async function loadCompanionNotifications() {
+    const listBox = document.getElementById('notification-list');
+    const countBadge = document.getElementById('unread-count');
+    const markAllBtn = document.getElementById('mark-all-read-btn');
+    if (!listBox) return;
+
+    async function render() {
+        const list = await getJson('/api/companion/notifications/me');
+        const unread = list.filter(n => !n.isRead).length;
+        if (countBadge) countBadge.textContent = `${unread} chưa đọc`;
+
+        if (!list.length) {
+            listBox.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3 mb-0">Bạn chưa có thông báo nào</p>
+                </div>`;
+            return;
+        }
+
+        listBox.innerHTML = list.map(n => {
+            const ic = notifIcon(n.title);
+            const timeStr = fmtDateTime(n.createdAt);
+            return `
+            <div class="notif-item d-flex gap-3 align-items-start ${n.isRead ? '' : 'unread'}" data-id="${n.id}" data-read="${n.isRead}">
+                <div class="notif-icon text-white" style="background: ${ic.bg};">
+                    <i class="bi ${ic.icon}"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="notif-title">${escapeHtml(n.title)}</div>
+                        ${!n.isRead ? '<span class="notif-dot ms-2 mt-2"></span>' : ''}
+                    </div>
+                    <div class="text-muted small mt-1">${escapeHtml(n.content)}</div>
+                    <div class="notif-time mt-1"><i class="bi bi-clock me-1"></i>${timeStr}</div>
+                </div>
+            </div>`;
+        }).join('');
+
+        listBox.querySelectorAll('.notif-item[data-read="false"]').forEach(item => {
+            item.addEventListener('click', async () => {
+                const id = item.getAttribute('data-id');
+                await fetch(`/api/companion/notifications/${id}/read`, { method: 'PATCH' });
+                item.classList.remove('unread');
+                item.setAttribute('data-read', 'true');
+                const dot = item.querySelector('.notif-dot');
+                if (dot) dot.remove();
+                const refreshed = await getJson('/api/companion/notifications/me');
+                const u = refreshed.filter(nn => !nn.isRead).length;
+                if (countBadge) countBadge.textContent = `${u} chưa đọc`;
+            });
+        });
+    }
+
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', async () => {
+            await fetch('/api/companion/notifications/read-all', { method: 'PATCH' });
+            await render();
+        });
+    }
+
+    await render();
 }
 
 document.getElementById('logout-btn').addEventListener('click', async (e) => {
