@@ -44,6 +44,7 @@ public class Companion {
     @Column(length = 50)
     private String gameRank;
 
+    @Column(name = "online", nullable = false)
     private Boolean onlineStatus = false;
 
     @Column(nullable = false)
@@ -81,6 +82,19 @@ public class Companion {
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
+
+    @PrePersist
+    void prePersistDefaults() {
+        if (onlineStatus == null) {
+            onlineStatus = false;
+        }
+        if (pricePerHour == null) {
+            pricePerHour = BigDecimal.valueOf(200000);
+        }
+        if (status == null) {
+            status = Status.PENDING;
+        }
+    }
 
     public enum Status {
         PENDING, APPROVED, REJECTED
