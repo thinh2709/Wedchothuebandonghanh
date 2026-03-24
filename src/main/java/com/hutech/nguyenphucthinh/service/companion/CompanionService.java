@@ -12,8 +12,10 @@ import com.hutech.nguyenphucthinh.repository.CompanionAvailabilityRepository;
 import com.hutech.nguyenphucthinh.repository.CompanionRepository;
 import com.hutech.nguyenphucthinh.repository.ConsultationRepository;
 import com.hutech.nguyenphucthinh.repository.ReviewRepository;
+import com.hutech.nguyenphucthinh.repository.ServicePriceRepository;
 import com.hutech.nguyenphucthinh.repository.TransactionRepository;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
+import com.hutech.nguyenphucthinh.repository.WithdrawalRepository;
 import com.hutech.nguyenphucthinh.service.user.NotificationService;
 import com.hutech.nguyenphucthinh.service.user.WalletService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,10 @@ public class CompanionService {
     private WalletService walletService;
     @Autowired
     private NotificationService notificationService;
+    @Autowired
+    private ServicePriceRepository servicePriceRepository;
+    @Autowired
+    private WithdrawalRepository withdrawalRepository;
 
     public List<Companion> getAllCompanions() {
         List<Companion> companions = companionRepository.findByStatus(Companion.Status.APPROVED);
@@ -118,6 +124,27 @@ public class CompanionService {
         companion.setOnlineStatus(Boolean.TRUE.equals(onlineStatus));
         companion.setAvatarUrl(avatarUrl);
         companion.setIntroVideoUrl(introVideoUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updateIdentity(Long userId, String identityNumber, String identityImageUrl, String portraitImageUrl) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setIdentityNumber(identityNumber);
+        companion.setIdentityImageUrl(identityImageUrl);
+        companion.setPortraitImageUrl(portraitImageUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updateMediaAndSkills(Long userId, String introMediaUrls, String skills) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setIntroMediaUrls(introMediaUrls);
+        companion.setSkills(skills);
+        return companionRepository.save(companion);
+    }
+
+    public Companion setOnlineStatus(Long userId, boolean online) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setOnlineStatus(online);
         return companionRepository.save(companion);
     }
 

@@ -55,6 +55,21 @@ public class Companion {
     @Column(length = 500)
     private String introVideoUrl;
 
+    @Column(length = 30)
+    private String identityNumber;
+
+    @Column(length = 500)
+    private String identityImageUrl;
+
+    @Column(length = 500)
+    private String portraitImageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String introMediaUrls;
+
+    @Column(columnDefinition = "TEXT")
+    private String skills;
+
     @Transient
     private Double responseRate;
 
