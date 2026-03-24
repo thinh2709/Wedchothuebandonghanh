@@ -4,82 +4,69 @@ import com.hutech.nguyenphucthinh.model.User;
 import com.hutech.nguyenphucthinh.service.user.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
-@Controller
+@RestController
+@RequestMapping("/api/user")
 public class UserController {
 
     @Autowired
     private UserService userService;
 
-    @GetMapping("/register")
-    public String showRegistrationForm(HttpServletRequest request) {
-        return redirectWithQuery("/user/register.html", request.getQueryString());
-    }
-
-    @GetMapping("/user/register")
-    public String legacyRegistrationForm(HttpServletRequest request) {
-        return redirectWithQuery("/register", request.getQueryString());
-    }
-
     @PostMapping("/register")
-    public String register(@RequestParam String username, @RequestParam String password, @RequestParam String email) {
+    public Map<String, Object> register(@RequestBody Map<String, String> request) {
         User user = new User();
-        user.setUsername(username);
-        user.setPassword(password);
-        user.setEmail(email);
+        user.setUsername(request.get("username"));
+        user.setPassword(request.get("password"));
+        user.setEmail(request.get("email"));
         user.setRole(User.Role.CUSTOMER);
+        
+        Map<String, Object> response = new HashMap<>();
         try {
             userService.register(user);
-            return "redirect:/login?registered=1";
+            response.put("success", true);
+            response.put("message", "Đăng ký thành công");
+            return response;
         } catch (Exception e) {
-            String error = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8);
-            return "redirect:/register?error=" + error;
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return response;
         }
     }
 
-    @GetMapping("/login")
-    public String showLoginForm(HttpServletRequest request) {
-        return redirectWithQuery("/user/login.html", request.getQueryString());
-    }
-
-    @GetMapping("/user/login")
-    public String legacyLoginForm(HttpServletRequest request) {
-        return redirectWithQuery("/login", request.getQueryString());
-    }
-
     @PostMapping("/login")
-    public String login(@RequestParam String username, @RequestParam String password, HttpSession session) {
+    public Map<String, Object> login(@RequestBody Map<String, String> request, HttpSession session) {
+        String username = request.get("username");
+        String password = request.get("password");
         Optional<User> user = userService.login(username, password);
+        Map<String, Object> response = new HashMap<>();
         if (user.isPresent()) {
             session.setAttribute("userId", user.get().getId());
             session.setAttribute("username", user.get().getUsername());
             session.setAttribute("role", user.get().getRole().name());
-            if (user.get().getRole() == User.Role.COMPANION) {
-                return "redirect:/companion/dashboard.html";
-            }
-            if (user.get().getRole() == User.Role.ADMIN) {
-                return "redirect:/admin/dashboard.html";
-            }
-            String usernameEncoded = URLEncoder.encode(user.get().getUsername(), StandardCharsets.UTF_8);
-            return "redirect:/user/index.html?loginSuccess=1&username=" + usernameEncoded;
+            
+            response.put("success", true);
+            response.put("userId", user.get().getId());
+            response.put("username", user.get().getUsername());
+            response.put("role", user.get().getRole().name());
+            return response;
         } else {
-            String error = URLEncoder.encode("Sai tên đăng nhập hoặc mật khẩu", StandardCharsets.UTF_8);
-            return "redirect:/login?error=" + error;
+            response.put("success", false);
+            response.put("message", "Sai tên đăng nhập hoặc mật khẩu");
+            return response;
         }
     }
 
     @PostMapping("/logout")
-    public String logout(HttpSession session) {
+    public Map<String, Object> logout(HttpSession session) {
         session.invalidate();
-        return "redirect:/user/index.html";
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        return response;
     }
 
     private String redirectWithQuery(String path, String query) {

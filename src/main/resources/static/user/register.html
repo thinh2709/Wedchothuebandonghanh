@@ -3,80 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng ký User</title>
+    <title>Dang ky User</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/css/user.css">
+    <link rel="stylesheet" href="../css/user.css">
 </head>
-<body class="bg-light">
-    <main class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-12 col-md-8 col-lg-6">
-                <div class="card shadow-sm">
-                    <div class="card-body p-4">
-                        <h1 class="h4 text-center mb-3">Đăng ký tài khoản</h1>
-                        <div id="register-message" class="alert d-none" role="alert"></div>
-                        <form id="register-form" action="/register" method="post" novalidate>
-                            <div class="mb-3">
-                                <label for="username" class="form-label">Tên người dùng</label>
-                                <input type="text" id="username" name="username" class="form-control" required minlength="4" maxlength="30" pattern="[a-zA-Z0-9._-]+">
-                                <div class="form-text">4-30 ký tự, chỉ gồm chữ/số/._-</div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email" id="email" name="email" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="password" class="form-label">Mật khẩu</label>
-                                <input type="password" id="password" name="password" class="form-control" required minlength="6">
-                            </div>
-                            <div class="mb-3">
-                                <label for="confirm-password" class="form-label">Nhập lại mật khẩu</label>
-                                <input type="password" id="confirm-password" class="form-control" required minlength="6">
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Đăng ký</button>
-                        </form>
-                        <p class="text-center text-muted small mt-3 mb-0">
-                            Đã có tài khoản? <a href="/login">Đăng nhập</a>
-                        </p>
-                    </div>
+<body data-page="register" class="bg-light">
+<main class="container py-5">
+    <div class="card auth-card mx-auto user-card">
+        <div class="card-body p-4">
+            <h1 class="h4 page-title mb-3">Dang ky tai khoan</h1>
+            <div id="auth-message" class="mb-3"></div>
+            <form id="register-form" class="row g-3">
+                <div class="col-12">
+                    <label for="username" class="form-label">Ten dang nhap</label>
+                    <input type="text" id="username" name="username" class="form-control" required>
                 </div>
-            </div>
+                <div class="col-12">
+                    <label for="password" class="form-label">Mat khau</label>
+                    <input type="password" id="password" name="password" class="form-control" required>
+                </div>
+                <div class="col-12">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" id="email" name="email" class="form-control" required>
+                </div>
+                <div class="col-12 d-grid">
+                    <button type="submit" class="btn btn-primary">Dang ky</button>
+                </div>
+            </form>
+            <p class="mt-3 mb-0 text-muted">Da co tai khoan? <a href="/user/login.html">Dang nhap ngay</a></p>
         </div>
-    </main>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const messageEl = document.getElementById('register-message');
-        const form = document.getElementById('register-form');
-        if (messageEl && params.get('error')) {
-            messageEl.textContent = params.get('error');
-            messageEl.className = 'alert alert-danger';
-        }
-        form.addEventListener('submit', (event) => {
-            const username = document.getElementById('username').value.trim();
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            const confirm = document.getElementById('confirm-password').value;
-
-            if (!username || !email || !password || !confirm) {
-                event.preventDefault();
-                messageEl.textContent = 'Vui lòng nhập đầy đủ thông tin.';
-                messageEl.className = 'alert alert-warning';
-                return;
-            }
-            if (password.length < 6) {
-                event.preventDefault();
-                messageEl.textContent = 'Mật khẩu phải có ít nhất 6 ký tự.';
-                messageEl.className = 'alert alert-warning';
-                return;
-            }
-            if (password !== confirm) {
-                event.preventDefault();
-                messageEl.textContent = 'Mật khẩu nhập lại không khớp.';
-                messageEl.className = 'alert alert-warning';
-                return;
-            }
-        });
-    </script>
+    </div>
+</main>
+<script src="../js/user.js"></script>
 </body>
 </html>

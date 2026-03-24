@@ -26,6 +26,11 @@ public class Report {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String reason;
 
+    @Column(length = 50)
+    private String category;
+
+    private Boolean emergency = false;
+
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
 

@@ -2,6 +2,7 @@ package com.hutech.nguyenphucthinh.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -28,6 +29,15 @@ public class Booking {
 
     @Column(nullable = false)
     private Integer duration; // in minutes
+
+    @Column(length = 255)
+    private String location;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
+    @Column(nullable = false)
+    private BigDecimal holdAmount = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
@@ -59,6 +69,6 @@ public class Booking {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public enum Status {
-        PENDING, ACCEPTED, REJECTED, IN_PROGRESS, COMPLETED
+        PENDING, ACCEPTED, REJECTED, IN_PROGRESS, COMPLETED, CANCELLED
     }
 }

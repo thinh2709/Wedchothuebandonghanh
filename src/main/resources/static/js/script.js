@@ -47,9 +47,11 @@ function updateAuthNavigation() {
 
             const links = Array.from(nav.querySelectorAll('a'));
             links.forEach(link => {
-                if (link.getAttribute('href') === '/login' || link.getAttribute('href') === '/login.html'
-                    || link.getAttribute('href') === '/register' || link.getAttribute('href') === '/register.html'
-                    || link.getAttribute('href') === '/user/login' || link.getAttribute('href') === '/user/register') {
+                const href = link.getAttribute('href');
+                if (href === '/login' || href === '/login.html'
+                    || href === '/register' || href === '/register.html'
+                    || href === '/user/login' || href === '/user/register'
+                    || href === '/user/login.html' || href === '/user/register.html') {
                     link.remove();
                 }
             });
@@ -66,7 +68,7 @@ function updateAuthNavigation() {
             logoutLink.textContent = 'Đăng xuất';
             logoutLink.addEventListener('click', (event) => {
                 event.preventDefault();
-                fetch('/logout', { method: 'POST' })
+                fetch('/api/user/logout', { method: 'POST' })
                     .then(() => {
                         window.location.href = '/user/index.html';
                     })

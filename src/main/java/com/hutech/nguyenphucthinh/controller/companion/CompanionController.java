@@ -29,6 +29,19 @@ public class CompanionController {
         return companionService.getAllCompanions();
     }
 
+    @GetMapping("/search")
+    public List<Companion> searchCompanions(
+            @RequestParam(required = false) String serviceType,
+            @RequestParam(required = false) String area,
+            @RequestParam(required = false) String gender,
+            @RequestParam(required = false) String gameRank,
+            @RequestParam(required = false) Boolean online,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice
+    ) {
+        return companionService.searchCompanions(serviceType, area, gender, gameRank, online, minPrice, maxPrice);
+    }
+
     @GetMapping("/{id}")
     public Optional<Companion> getCompanionById(@PathVariable Long id) {
         return companionService.getCompanionById(id);
@@ -45,7 +58,14 @@ public class CompanionController {
                 request.getOrDefault("bio", ""),
                 request.getOrDefault("hobbies", ""),
                 request.getOrDefault("appearance", ""),
-                request.getOrDefault("availability", "")
+                request.getOrDefault("availability", ""),
+                request.getOrDefault("serviceType", ""),
+                request.getOrDefault("area", ""),
+                request.getOrDefault("gender", ""),
+                request.getOrDefault("gameRank", ""),
+                Boolean.parseBoolean(request.getOrDefault("onlineStatus", "false")),
+                request.getOrDefault("avatarUrl", ""),
+                request.getOrDefault("introVideoUrl", "")
         );
         session.setAttribute("role", "COMPANION");
         return companion;
@@ -71,7 +91,14 @@ public class CompanionController {
                 request.getOrDefault("bio", ""),
                 request.getOrDefault("hobbies", ""),
                 request.getOrDefault("appearance", ""),
-                request.getOrDefault("availability", "")
+                request.getOrDefault("availability", ""),
+                request.getOrDefault("serviceType", ""),
+                request.getOrDefault("area", ""),
+                request.getOrDefault("gender", ""),
+                request.getOrDefault("gameRank", ""),
+                Boolean.parseBoolean(request.getOrDefault("onlineStatus", "false")),
+                request.getOrDefault("avatarUrl", ""),
+                request.getOrDefault("introVideoUrl", "")
         );
     }
 

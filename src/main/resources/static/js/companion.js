@@ -407,11 +407,7 @@ async function bootstrap() {
     try {
         const auth = await getJson('/api/auth/me');
         if (!auth.authenticated) {
-            window.location.href = '/login';
-            return;
-        }
-        if (auth.role !== 'COMPANION') {
-            showAlert('Tai khoan hien tai khong phai companion.', 'danger');
+            window.location.href = '/user/login.html';
             return;
         }
         document.getElementById('auth-user').textContent = `Xin chào, ${auth.username}`;
@@ -463,13 +459,13 @@ async function bootstrap() {
             loadWithdrawals()
         ]);
     } catch (_) {
-        window.location.href = '/login';
+        window.location.href = '/user/login.html';
     }
 }
 
 document.getElementById('logout-btn').addEventListener('click', async (e) => {
     e.preventDefault();
-    await fetch('/logout', { method: 'POST' });
+    await fetch('/api/user/logout', { method: 'POST' });
     window.location.href = '/user/index.html';
 });
 
