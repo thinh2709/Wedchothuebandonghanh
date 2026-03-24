@@ -30,6 +30,24 @@ public class Companion {
     @Column(columnDefinition = "TEXT")
     private String availability;
 
+    @Column(length = 20)
+    private String identityNumber;
+
+    @Column(columnDefinition = "TEXT")
+    private String identityImageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String portraitImageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String introMediaUrls;
+
+    @Column(columnDefinition = "TEXT")
+    private String skills;
+
+    @Column(nullable = false)
+    private Boolean online = false;
+
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
 

@@ -3,21 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ho so Companion - User</title>
+    <title>Hồ sơ Companion - User</title>
     <link rel="stylesheet" href="/css/user.css">
 </head>
 <body>
     <header>
         <a href="/user/index.html" class="logo">Companion Rental</a>
         <nav>
-            <a href="/user/search.html">Tim kiem</a>
-            <a href="/login">Dang nhap</a>
-            <a href="/register">Dang ky</a>
+            <a href="/user/search.html">Tìm kiếm</a>
+            <a href="/companion/register.html">Đăng ký Companion</a>
+            <a href="/login">Đăng nhập</a>
+            <a href="/register">Đăng ký</a>
         </nav>
     </header>
     <div class="container">
         <div id="profile-container" class="card" style="max-width: 800px; margin: 2rem auto;">
-            <p style="text-align: center;">Dang tai ho so...</p>
+            <p style="text-align: center;">Đang tải hồ sơ...</p>
         </div>
     </div>
     <script src="/js/user.js"></script>
@@ -32,14 +33,14 @@
                     .then(companion => {
                         profileContainer.innerHTML = `
                             <h1>${companion.user.fullName || companion.user.username}</h1>
-                            <p><strong>Tieu su:</strong> ${companion.bio || ''}</p>
-                            <p><strong>So thich:</strong> ${companion.hobbies || ''}</p>
-                            <p><strong>Ngoai hinh:</strong> ${companion.appearance || ''}</p>
-                            <a href="/user/booking.html?id=${companion.id}" class="btn" style="background-color: var(--primary-color); color: white;">Dat lich ngay</a>
+                            <p><strong>Tiểu sử:</strong> ${companion.bio || ''}</p>
+                            <p><strong>Sở thích:</strong> ${companion.hobbies || ''}</p>
+                            <p><strong>Ngoại hình:</strong> ${companion.appearance || ''}</p>
+                            <a href="/user/booking.html?id=${companion.id}" class="btn" style="background-color: var(--primary-color); color: white;">Đặt lịch ngay</a>
                         `;
                     })
                     .catch(() => {
-                        profileContainer.innerHTML = '<p style="text-align: center;">Loi khi tai ho so.</p>';
+                        profileContainer.innerHTML = '<p style="text-align: center;">Lỗi khi tải hồ sơ.</p>';
                     });
             }
         });

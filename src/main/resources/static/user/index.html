@@ -10,30 +10,31 @@
     <header>
         <a href="/user/index.html" class="logo">Companion Rental</a>
         <nav>
-            <a href="/search.html">Tim kiem</a>
-            <a href="/companion/dashboard.html">Khu vuc Companion</a>
-            <a href="/login">Dang nhap</a>
-            <a href="/register">Dang ky</a>
-            <a href="/policy.html">Chinh sach</a>
+            <a href="/search.html">Tìm kiếm</a>
+            <a href="/companion/register.html">Đăng ký Companion</a>
+            <a href="/companion/dashboard.html">Khu vực Companion</a>
+            <a href="/login">Đăng nhập</a>
+            <a href="/register">Đăng ký</a>
+            <a href="/policy.html">Chính sách</a>
         </nav>
     </header>
 
     <div class="container">
         <section class="hero">
-            <h1>Khu vuc User</h1>
+            <h1>Khu vực User</h1>
             <p id="login-success-message" style="font-weight: bold; margin-bottom: 1rem;"></p>
-            <p>Day la trang lam viec rieng cho nhom User.</p>
-            <a href="/search.html" class="btn">Bat dau ngay</a>
+            <p>Đây là trang làm việc riêng cho nhóm User.</p>
+            <a href="/search.html" class="btn">Bắt đầu ngay</a>
         </section>
 
         <section>
-            <h2 style="margin-bottom: 2rem; text-align: center;">Ban Dong Hanh Noi Bat</h2>
+            <h2 style="margin-bottom: 2rem; text-align: center;">Bạn Đồng Hành Nổi Bật</h2>
             <div id="companion-grid" class="grid">
                 <div class="companion-card">
                     <div class="companion-img"></div>
                     <div class="companion-info">
-                        <div class="companion-name">Dang tai...</div>
-                        <div class="companion-bio">Vui long cho trong giay lat.</div>
+                        <div class="companion-name">Đang tải...</div>
+                        <div class="companion-bio">Vui lòng chờ trong giây lát.</div>
                     </div>
                 </div>
             </div>
@@ -45,8 +46,8 @@
         const params = new URLSearchParams(window.location.search);
         const loginSuccessEl = document.getElementById('login-success-message');
         if (loginSuccessEl && params.get('loginSuccess') === '1') {
-            const username = params.get('username') || 'ban';
-            loginSuccessEl.textContent = `Dang nhap thanh cong. Xin chao ${username}!`;
+            const username = params.get('username') || 'bạn';
+            loginSuccessEl.textContent = `Đăng nhập thành công. Xin chào ${username}!`;
         }
     </script>
 </body>

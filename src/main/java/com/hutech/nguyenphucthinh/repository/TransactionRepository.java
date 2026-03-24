@@ -9,4 +9,7 @@ import java.math.BigDecimal;
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     @Query("select coalesce(sum(t.amount), 0) from Transaction t where t.booking.companion.id = :companionId and t.status = com.hutech.nguyenphucthinh.model.Transaction.Status.COMPLETED")
     BigDecimal sumCompletedIncomeByCompanionId(Long companionId);
+
+    @Query("select coalesce(sum(t.amount), 0) from Transaction t where t.booking.companion.id = :companionId and t.status = com.hutech.nguyenphucthinh.model.Transaction.Status.PENDING")
+    BigDecimal sumPendingHoldByCompanionId(Long companionId);
 }

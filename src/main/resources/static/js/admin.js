@@ -15,8 +15,8 @@ async function loadPending() {
             <td>${item.user?.username || ''}</td>
             <td>${item.bio || ''}</td>
             <td>
-                <button class="btn btn-sm btn-success" onclick="approve(${item.id})">Duyet</button>
-                <button class="btn btn-sm btn-danger" onclick="reject(${item.id})">Tu choi</button>
+                <button class="btn btn-sm btn-success" onclick="approve(${item.id})">Duyệt</button>
+                <button class="btn btn-sm btn-danger" onclick="reject(${item.id})">Từ chối</button>
             </td>
         `;
         rows.appendChild(tr);

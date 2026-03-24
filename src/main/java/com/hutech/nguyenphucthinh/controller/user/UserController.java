@@ -2,6 +2,7 @@ package com.hutech.nguyenphucthinh.controller.user;
 
 import com.hutech.nguyenphucthinh.model.User;
 import com.hutech.nguyenphucthinh.service.user.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import jakarta.servlet.http.HttpSession;
@@ -19,8 +20,13 @@ public class UserController {
     private UserService userService;
 
     @GetMapping("/register")
-    public String showRegistrationForm() {
-        return "redirect:/user/register.html";
+    public String showRegistrationForm(HttpServletRequest request) {
+        return redirectWithQuery("/user/register.html", request.getQueryString());
+    }
+
+    @GetMapping("/user/register")
+    public String legacyRegistrationForm(HttpServletRequest request) {
+        return redirectWithQuery("/register", request.getQueryString());
     }
 
     @PostMapping("/register")
@@ -32,16 +38,21 @@ public class UserController {
         user.setRole(User.Role.CUSTOMER);
         try {
             userService.register(user);
-            return "redirect:/user/login?registered=1";
+            return "redirect:/login?registered=1";
         } catch (Exception e) {
             String error = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8);
-            return "redirect:/user/register?error=" + error;
+            return "redirect:/register?error=" + error;
         }
     }
 
     @GetMapping("/login")
-    public String showLoginForm() {
-        return "redirect:/user/login.html";
+    public String showLoginForm(HttpServletRequest request) {
+        return redirectWithQuery("/user/login.html", request.getQueryString());
+    }
+
+    @GetMapping("/user/login")
+    public String legacyLoginForm(HttpServletRequest request) {
+        return redirectWithQuery("/login", request.getQueryString());
     }
 
     @PostMapping("/login")
@@ -61,7 +72,7 @@ public class UserController {
             return "redirect:/user/index.html?loginSuccess=1&username=" + usernameEncoded;
         } else {
             String error = URLEncoder.encode("Sai tên đăng nhập hoặc mật khẩu", StandardCharsets.UTF_8);
-            return "redirect:/user/login?error=" + error;
+            return "redirect:/login?error=" + error;
         }
     }
 
@@ -69,5 +80,12 @@ public class UserController {
     public String logout(HttpSession session) {
         session.invalidate();
         return "redirect:/user/index.html";
+    }
+
+    private String redirectWithQuery(String path, String query) {
+        if (query == null || query.isBlank()) {
+            return "redirect:" + path;
+        }
+        return "redirect:" + path + "?" + query;
     }
 }
