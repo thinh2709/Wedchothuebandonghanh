@@ -36,7 +36,7 @@ public class WalletService {
         tx.setAmount(amount);
         tx.setType(WalletTransaction.Type.DEPOSIT);
         tx.setProvider(provider == null || provider.isBlank() ? "MANUAL" : provider);
-        tx.setDescription("Nap tien vao vi");
+        tx.setDescription("Nạp tiền vào ví");
         walletTransactionRepository.save(tx);
         return user;
     }
@@ -46,7 +46,7 @@ public class WalletService {
             return;
         }
         if (user.getBalance().compareTo(amount) < 0) {
-            throw new RuntimeException("So du vi khong du de giu tien coc");
+            throw new RuntimeException("Số dư ví không đủ để giữ tiền cọc");
         }
         user.setBalance(user.getBalance().subtract(amount));
         userRepository.save(user);
@@ -57,7 +57,7 @@ public class WalletService {
         tx.setAmount(amount.negate());
         tx.setType(WalletTransaction.Type.HOLD);
         tx.setProvider("SYSTEM");
-        tx.setDescription("Giu tien coc khi don duoc chap nhan");
+        tx.setDescription("Giữ tiền cọc khi đơn được chấp nhận");
         walletTransactionRepository.save(tx);
     }
 
@@ -74,7 +74,7 @@ public class WalletService {
         tx.setAmount(amount);
         tx.setType(WalletTransaction.Type.REFUND);
         tx.setProvider("SYSTEM");
-        tx.setDescription("Hoan tien coc");
+        tx.setDescription("Hoàn tiền cọc");
         walletTransactionRepository.save(tx);
     }
 
@@ -85,7 +85,7 @@ public class WalletService {
         tx.setAmount(amount.negate());
         tx.setType(WalletTransaction.Type.CHARGE);
         tx.setProvider("SYSTEM");
-        tx.setDescription("Thanh toan booking");
+        tx.setDescription("Thanh toán booking");
         walletTransactionRepository.save(tx);
     }
 

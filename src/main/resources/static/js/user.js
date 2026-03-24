@@ -45,22 +45,22 @@ function renderTopNav(auth) {
     const nav = document.getElementById("top-nav");
     if (!nav) return;
     const links = `
-        <a class="btn btn-link text-decoration-none" href="/user/index.html">Trang chu</a>
-        <a class="btn btn-link text-decoration-none" href="/user/search.html">Tim kiem</a>
-        <a class="btn btn-link text-decoration-none" href="/user/booking.html">Dat lich</a>
-        <a class="btn btn-link text-decoration-none" href="/user/appointments.html">Lich hen</a>
+        <a class="btn btn-link text-decoration-none" href="/user/index.html">Trang chủ</a>
+        <a class="btn btn-link text-decoration-none" href="/user/search.html">Tìm kiếm</a>
+        <a class="btn btn-link text-decoration-none" href="/user/booking.html">Đặt lịch</a>
+        <a class="btn btn-link text-decoration-none" href="/user/appointments.html">Lịch hẹn</a>
         <a class="btn btn-link text-decoration-none" href="/user/chat.html?bookingId=">Chat/Call</a>
-        <a class="btn btn-link text-decoration-none" href="/user/wallet.html">Vi tien</a>
-        <a class="btn btn-link text-decoration-none" href="/user/favorites.html">Yeu thich</a>
-        <a class="btn btn-link text-decoration-none" href="/user/review.html">Danh gia</a>
-        <a class="btn btn-link text-decoration-none" href="/user/report.html">To cao</a>
-        <a class="btn btn-link text-decoration-none position-relative" href="#" id="notification-link">Thong bao <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span></a>
+        <a class="btn btn-link text-decoration-none" href="/user/wallet.html">Ví tiền</a>
+        <a class="btn btn-link text-decoration-none" href="/user/favorites.html">Yêu thích</a>
+        <a class="btn btn-link text-decoration-none" href="/user/review.html">Đánh giá</a>
+        <a class="btn btn-link text-decoration-none" href="/user/report.html">Tố cáo</a>
+        <a class="btn btn-link text-decoration-none position-relative" href="#" id="notification-link">Thông báo <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span></a>
     `;
     const authPart = auth.authenticated
-        ? `<span class="navbar-text ms-2">Xin chao, <strong>${escapeHtml(auth.username)}</strong></span>
-           <button id="logout-btn" class="btn btn-outline-danger btn-sm ms-2">Dang xuat</button>`
-        : `<a class="btn btn-outline-primary btn-sm ms-2" href="/user/login.html">Dang nhap</a>
-           <a class="btn btn-primary btn-sm ms-2" href="/user/register.html">Dang ky</a>`;
+        ? `<span class="navbar-text ms-2">Xin chào, <strong>${escapeHtml(auth.username)}</strong></span>
+           <button id="logout-btn" class="btn btn-outline-danger btn-sm ms-2">Đăng xuất</button>`
+        : `<a class="btn btn-outline-primary btn-sm ms-2" href="/user/login.html">Đăng nhập</a>
+           <a class="btn btn-primary btn-sm ms-2" href="/user/register.html">Đăng ký</a>`;
     nav.innerHTML = `${links}${authPart}`;
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
@@ -73,19 +73,19 @@ function renderTopNav(auth) {
 
 function companionCard(companion) {
     const name = companion.user?.fullName || companion.user?.username || "Companion";
-    const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chua co danh gia";
+    const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chưa có đánh giá";
     return `
     <div class="col">
       <div class="card user-card h-100">
         <div class="card-body">
           <h5 class="card-title">${escapeHtml(name)} <span class="badge bg-warning text-dark small">${rating}</span></h5>
-          <p class="card-text mb-2"><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chua co")}</p>
-          <p class="card-text mb-2"><strong>So thich:</strong> ${escapeHtml(companion.hobbies || "Chua co")}</p>
+          <p class="card-text mb-2"><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chưa có")}</p>
+          <p class="card-text mb-2"><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
           <p class="card-text mb-2"><strong>Dich vu:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Khu vuc:</strong> ${escapeHtml(companion.area || "-")}</p>
           <p class="card-text mb-3"><strong>Gia:</strong> ${Number(companion.pricePerHour || 0).toLocaleString("vi-VN")} VND/h | <strong>Online:</strong> ${companion.onlineStatus ? "Yes" : "No"}</p>
           <div class="d-grid gap-2">
             <a class="btn btn-outline-primary btn-sm" href="/user/profile.html?id=${companion.id}">Xem profile</a>
-            <a class="btn btn-primary btn-sm" href="/user/booking.html?id=${companion.id}">Dat lich</a>
+            <a class="btn btn-primary btn-sm" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
           </div>
         </div>
       </div>
@@ -99,7 +99,7 @@ async function loadCompanions(targetId) {
     const companions = res.ok ? await res.json() : [];
     box.innerHTML = companions.length
         ? companions.map(companionCard).join("")
-        : `<div class="empty-state">Chua co companion nao.</div>`;
+        : `<div class="empty-state">Chưa có companion nào.</div>`;
     return companions;
 }
 
@@ -134,7 +134,7 @@ async function initSearchPage() {
             const text = `${c.user?.fullName || ""} ${c.user?.username || ""} ${c.bio || ""} ${c.hobbies || ""}`.toLowerCase();
             return !q || text.includes(q);
         });
-        grid.innerHTML = filtered.length ? filtered.map(companionCard).join("") : `<div class="empty-state">Khong tim thay ket qua phu hop.</div>`;
+        grid.innerHTML = filtered.length ? filtered.map(companionCard).join("") : `<div class="empty-state">Không tìm thấy kết quả phù hợp.</div>`;
     });
 }
 
@@ -145,24 +145,24 @@ async function initProfilePage(auth) {
     const res = await apiFetch(`/api/companions/${id}`);
     const companion = await res.json();
     const name = companion.user?.fullName || companion.user?.username || "Companion";
-    const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chua co danh gia";
+    const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chưa có đánh giá";
     box.innerHTML = `
         <div class="card user-card"><div class="card-body">
           ${companion.avatarUrl ? `<img src="${escapeHtml(companion.avatarUrl)}" alt="avatar" class="img-fluid rounded mb-3" style="max-height:220px;object-fit:cover;">` : ""}
           <h1 class="h4 mb-1">${escapeHtml(name)}</h1>
           <div class="mb-3 text-warning fw-bold">${rating}</div>
-          <p><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chua co")}</p>
-          <p><strong>So thich:</strong> ${escapeHtml(companion.hobbies || "Chua co")}</p>
-          <p><strong>Ngoai hinh:</strong> ${escapeHtml(companion.appearance || "Chua co")}</p>
-          <p><strong>Thoi gian ranh:</strong> ${escapeHtml(companion.availability || "Chua co")}</p>
+          <p><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chưa có")}</p>
+          <p><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
+          <p><strong>Ngoại hình:</strong> ${escapeHtml(companion.appearance || "Chưa có")}</p>
+          <p><strong>Thời gian rảnh:</strong> ${escapeHtml(companion.availability || "Chưa có")}</p>
           <p><strong>Dich vu:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Rank:</strong> ${escapeHtml(companion.gameRank || "-")}</p>
           <p><strong>Khu vuc:</strong> ${escapeHtml(companion.area || "-")} | <strong>Gioi tinh:</strong> ${escapeHtml(companion.gender || "-")}</p>
           <p><strong>Ty le phan hoi:</strong> ${Number(companion.responseRate || 0).toFixed(0)}%</p>
           ${companion.introVideoUrl ? `<a class="btn btn-sm btn-outline-dark mb-3" href="${escapeHtml(companion.introVideoUrl)}" target="_blank">Xem video gioi thieu</a>` : ""}
           <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-primary" href="/user/booking.html?id=${companion.id}">Dat lich</a>
-            <a class="btn btn-outline-secondary" href="/user/review.html">Danh gia</a>
-            <a class="btn btn-outline-warning" href="/user/report.html?reportedUserId=${companion.user?.id || ""}">To cao / SOS</a>
+            <a class="btn btn-primary" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
+            <a class="btn btn-outline-secondary" href="/user/review.html">Đánh giá</a>
+            <a class="btn btn-outline-warning" href="/user/report.html?reportedUserId=${companion.user?.id || ""}">Tố cáo / SOS</a>
             ${auth.authenticated ? `<button id="add-favorite-btn" class="btn btn-outline-danger">Them yeu thich</button>` : ""}
           </div>
           <div id="profile-message" class="mt-3"></div>
@@ -174,7 +174,7 @@ async function initProfilePage(auth) {
             if (response.ok) {
                 setMessage("profile-message", "success", "Da them vao yeu thich");
             } else {
-                setMessage("profile-message", "danger", "Them yeu thich that bai");
+                setMessage("profile-message", "danger", "Thêm yêu thích thất bại");
             }
         });
     }
@@ -209,7 +209,7 @@ async function initBookingPage(auth) {
         if (res.ok) {
             window.location.href = "/user/appointments.html";
         } else {
-            setMessage("booking-message", "danger", "Dat lich that bai. Vui long kiem tra thong tin.");
+            setMessage("booking-message", "danger", "Đặt lịch thất bại. Vui lòng kiểm tra thông tin.");
         }
     });
 }
@@ -223,12 +223,12 @@ async function initAppointmentsPage(auth) {
       <div class="card user-card mb-3"><div class="card-body">
         <h5>${escapeHtml(b.companion?.user?.fullName || b.companion?.user?.username || "Companion")}</h5>
         <div class="row">
-          <div class="col-md-6"><strong>Thoi gian:</strong> ${escapeHtml(formatDateTime(b.bookingTime))}</div>
-          <div class="col-md-6"><strong>Thoi luong:</strong> ${escapeHtml(b.duration)} phut</div>
+          <div class="col-md-6"><strong>Thời gian:</strong> ${escapeHtml(formatDateTime(b.bookingTime))}</div>
+          <div class="col-md-6"><strong>Thời lượng:</strong> ${escapeHtml(b.duration)} phút</div>
           <div class="col-md-6"><strong>Tien coc:</strong> ${escapeHtml(Number(b.holdAmount || 0).toLocaleString("vi-VN"))} VND</div>
-          <div class="col-md-6"><strong>Dia diem:</strong> ${escapeHtml(b.location || "-")}</div>
-          <div class="col-md-6"><strong>Trang thai:</strong> ${escapeHtml(b.status || "-")}</div>
-          <div class="col-12 mt-2"><strong>Ghi chu:</strong> ${escapeHtml(b.note || "-")}</div>
+          <div class="col-md-6"><strong>Địa điểm:</strong> ${escapeHtml(b.location || "-")}</div>
+          <div class="col-md-6"><strong>Trạng thái:</strong> ${escapeHtml(b.status || "-")}</div>
+          <div class="col-12 mt-2"><strong>Ghi chú:</strong> ${escapeHtml(b.note || "-")}</div>
         </div>
         <div class="d-flex gap-2 mt-3">
           ${b.status === "PENDING" || b.status === "ACCEPTED" ? `<button class="btn btn-outline-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel">Huy don</button>` : ""}
@@ -248,7 +248,7 @@ async function initAppointmentsPage(auth) {
                 : await apiFetch(`/api/bookings/me/${id}/${action}`, { method: "PATCH", headers: {} });
             if (!res.ok) {
                 const text = await res.text();
-                alert(text || "Thao tac that bai");
+                alert(text || "Thao tác thất bại");
                 return;
             }
             await initAppointmentsPage(auth);
@@ -310,7 +310,7 @@ async function initReviewPage(auth) {
     const completed = bookings.filter((b) => b.status === "COMPLETED");
     bookingSelect.innerHTML = completed.map((b) => `<option value="${b.id}">#${b.id} - ${escapeHtml(b.companion?.user?.username || "Companion")} (${escapeHtml(formatDateTime(b.bookingTime))})</option>`).join("");
     if (!completed.length) {
-        bookingSelect.innerHTML = `<option value="">Khong co lich hen da hoan thanh</option>`;
+        bookingSelect.innerHTML = `<option value="">Không có lịch hẹn đã hoàn thành</option>`;
     }
 
     document.getElementById("review-form")?.addEventListener("submit", async (e) => {
@@ -327,14 +327,14 @@ async function initReviewPage(auth) {
         };
         const res = await apiFetch("/api/reviews", { method: "POST", body: JSON.stringify(payload) });
         if (res.ok) {
-            setMessage("review-message", "success", "Gui danh gia thanh cong.");
+            setMessage("review-message", "success", "Gửi đánh giá thành công.");
             document.getElementById("review-form").reset();
             selectedRating = 5;
             renderStars("rating-stars", selectedRating);
             await loadMyReviews();
         } else {
             const text = await res.text();
-            setMessage("review-message", "danger", text || "Gui danh gia that bai.");
+            setMessage("review-message", "danger", text || "Gửi đánh giá thất bại.");
         }
     });
 
@@ -370,12 +370,12 @@ async function initReportPage(auth) {
         };
         const res = await apiFetch("/api/reports", { method: "POST", body: JSON.stringify(payload) });
         if (res.ok) {
-            setMessage("report-message", "success", "Gui to cao thanh cong.");
+            setMessage("report-message", "success", "Gửi tố cáo thành công.");
             document.getElementById("report-form").reset();
             await loadMyReports();
         } else {
             const text = await res.text();
-            setMessage("report-message", "danger", text || "Gui to cao that bai.");
+            setMessage("report-message", "danger", text || "Gửi tố cáo thất bại.");
         }
     });
 
@@ -385,7 +385,7 @@ async function initReportPage(auth) {
         const box = document.getElementById("report-list");
         box.innerHTML = reports.length ? reports.map((r) => `
             <div class="card user-card mb-2"><div class="card-body">
-              <div><strong>To cao user #${r.reportedUser?.id || "-"}</strong> - ${escapeHtml(r.status || "PENDING")}</div>
+              <div><strong>Tố cáo user #${r.reportedUser?.id || "-"}</strong> - ${escapeHtml(r.status || "PENDING")}</div>
               <div><strong>Loai:</strong> ${escapeHtml(r.category || "OTHER")} ${r.emergency ? '<span class="badge bg-danger">SOS</span>' : ''}</div>
               <div class="text-muted small">${escapeHtml(formatDateTime(r.createdAt))}</div>
               <div>${escapeHtml(r.reason || "")}</div>
@@ -408,7 +408,7 @@ async function initChatPage(auth) {
         const res = await apiFetch(`/api/chat/${currentBookingId}/messages`, { headers: {} });
         const list = res.ok ? await res.json() : [];
         const box = document.getElementById("chat-list");
-        box.innerHTML = list.map((m) => `<div class="mb-2"><strong>${escapeHtml(m.sender?.username || "user")}:</strong> ${escapeHtml(m.content)} <span class="text-muted small">(${escapeHtml(formatDateTime(m.createdAt))})</span></div>`).join("") || `<div class="text-muted">Chua co tin nhan.</div>`;
+        box.innerHTML = list.map((m) => `<div class="mb-2"><strong>${escapeHtml(m.sender?.username || "user")}:</strong> ${escapeHtml(m.content)} <span class="text-muted small">(${escapeHtml(formatDateTime(m.createdAt))})</span></div>`).join("") || `<div class="text-muted">Chưa có tin nhắn.</div>`;
         box.scrollTop = box.scrollHeight;
     }
 
@@ -417,7 +417,7 @@ async function initChatPage(auth) {
         e.preventDefault();
         currentBookingId = Number(bookingInput.value || 0);
         if (!currentBookingId) {
-            setMessage("chat-message", "warning", "Vui long nhap booking ID.");
+            setMessage("chat-message", "warning", "Vui lòng nhập booking ID.");
             return;
         }
         const content = document.getElementById("chat-content").value.trim();
@@ -428,7 +428,7 @@ async function initChatPage(auth) {
             await loadMessages();
         } else {
             const text = await res.text();
-            setMessage("chat-message", "danger", text || "Gui tin nhan that bai");
+            setMessage("chat-message", "danger", text || "Gửi tin nhắn thất bại");
         }
     });
     document.getElementById("call-btn")?.addEventListener("click", async () => {
@@ -460,7 +460,7 @@ async function refreshNotifications() {
     badge.classList.toggle("d-none", unread <= 0);
     link.onclick = (e) => {
         e.preventDefault();
-        alert(list.slice(0, 10).map((n) => `- ${n.title}: ${n.content}`).join("\n") || "Khong co thong bao");
+        alert(list.slice(0, 10).map((n) => `- ${n.title}: ${n.content}`).join("\n") || "Không có thông báo");
     };
 }
 
@@ -478,12 +478,12 @@ async function initWalletPage(auth) {
         };
         const res = await apiFetch("/api/wallet/deposit", { method: "POST", body: JSON.stringify(payload) });
         if (res.ok) {
-            setMessage("wallet-message", "success", "Nap tien thanh cong");
+            setMessage("wallet-message", "success", "Nạp tiền thành công");
             document.getElementById("deposit-form").reset();
             await initWalletPage(auth);
         } else {
             const text = await res.text();
-            setMessage("wallet-message", "danger", text || "Nap tien that bai");
+            setMessage("wallet-message", "danger", text || "Nạp tiền thất bại");
         }
     });
 
@@ -498,7 +498,7 @@ async function initWalletPage(auth) {
             <td>${escapeHtml(t.description || "-")}</td>
             <td class="${Number(t.amount) < 0 ? "text-danger" : "text-success"}">${Number(t.amount || 0).toLocaleString("vi-VN")} VND</td>
         </tr>
-    `).join("") : `<tr><td colspan="5" class="text-muted">Chua co giao dich.</td></tr>`;
+    `).join("") : `<tr><td colspan="5" class="text-muted">Chưa có giao dịch.</td></tr>`;
 }
 
 function initAuthPages() {
@@ -518,7 +518,7 @@ function initAuthPages() {
                 else if (result.role === "COMPANION") window.location.href = "/companion/dashboard.html";
                 else window.location.href = "/user/index.html";
             } else {
-                setMessage("auth-message", "danger", result.message || "Dang nhap that bai");
+                setMessage("auth-message", "danger", result.message || "Đăng nhập thất bại");
             }
         });
     }
@@ -537,7 +537,7 @@ function initAuthPages() {
             if (result.success) {
                 window.location.href = "/user/login.html?registered=1";
             } else {
-                setMessage("auth-message", "danger", result.message || "Dang ky that bai");
+                setMessage("auth-message", "danger", result.message || "Đăng ký thất bại");
             }
         });
     }
@@ -545,7 +545,7 @@ function initAuthPages() {
     const params = new URLSearchParams(window.location.search);
     const registered = params.get("registered");
     if (document.getElementById("auth-message")) {
-        if (registered === "1") setMessage("auth-message", "success", "Dang ky thanh cong, vui long dang nhap.");
+        if (registered === "1") setMessage("auth-message", "success", "Đăng ký thành công, vui lòng đăng nhập.");
     }
 }
 

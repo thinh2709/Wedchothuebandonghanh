@@ -213,7 +213,7 @@ async function sendSos(bookingId) {
 }
 
 async function rateUser(bookingId) {
-    const rating = prompt('Danh gia user (1-5):');
+    const rating = prompt('Đánh giá user (1-5):');
     if (!rating) {
         return;
     }

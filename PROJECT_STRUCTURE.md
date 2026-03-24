@@ -1,6 +1,6 @@
 # Chia project theo team
 
-Project da duoc tach theo 3 vai tro de chia viec nhom:
+Project đã được tách theo 3 vai trò để chia việc nhóm:
 
 ## Backend
 
@@ -26,10 +26,10 @@ Project da duoc tach theo 3 vai tro de chia viec nhom:
 
 ## Compatibility
 
-- Khong con de file role ben ngoai thu muc role.
-- `static/index.html` la portal chung, `static/policy.html` la trang chung.
+- Không còn để file role bên ngoài thư mục role.
+- `static/index.html` là portal chung, `static/policy.html` là trang chung.
 
-## Goi y chia task
+## Gợi ý chia task
 
 - Team Admin: `controller.admin`, `service.admin`, `static/admin`
 - Team User: `controller.user`, `service.user`, `static/user`

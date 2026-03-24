@@ -27,7 +27,7 @@ describe('Companion Flow', () => {
     });
   };
 
-  it('registers companion and opens dashboard', () => {
+  it('đăng ký companion và mở dashboard', () => {
     registerUser();
     loginUser();
 
@@ -38,12 +38,12 @@ describe('Companion Flow', () => {
     cy.get('#availability').type('tối thứ 2-6');
     cy.get('#register-form').submit();
 
-    cy.contains(/Gửi đăng ký thành công|Gui dang ky thanh cong/);
+    cy.contains('Gửi đăng ký thành công');
     cy.url({ timeout: 10000 }).should('include', '/companion/dashboard.html');
-    cy.contains(/Khu vực Companion|Khu vuc Companion/);
+    cy.contains('Khu vực Companion');
   });
 
-  it('updates profile and toggles online', () => {
+  it('cập nhật hồ sơ và bật/tắt online', () => {
     loginUser();
     cy.visit('/companion/dashboard.html');
 
@@ -57,13 +57,13 @@ describe('Companion Flow', () => {
     cy.get('#intro-media-urls').clear().type('https://example.com/intro1.jpg,https://example.com/intro2.mp4');
     cy.get('#skills').clear().type('trò chuyện, outing');
     cy.get('#profile-form').submit();
-    cy.contains(/Đã cập nhật hồ sơ companion\.|Da cap nhat ho so companion\./);
+    cy.contains('Đã cập nhật hồ sơ companion.');
 
     cy.get('#online-toggle').click({ force: true });
-    cy.contains(/Đã cập nhật trạng thái online\.|Da cap nhat trang thai online\./);
+    cy.contains('Đã cập nhật trạng thái online.');
   });
 
-  it('manages availability slots', () => {
+  it('quản lý lịch rảnh', () => {
     loginUser();
     cy.visit('/companion/dashboard.html');
 
@@ -71,14 +71,14 @@ describe('Companion Flow', () => {
     cy.get('#end-time').type('2026-03-30T11:00');
     cy.get('#note').type('slot test cypress');
     cy.get('#availability-form').submit();
-    cy.contains(/Đã thêm khung giờ rảnh\.|Da them khung gio ranh\./);
+    cy.contains('Đã thêm khung giờ rảnh.');
     cy.get('#availability-body').should('contain.text', 'slot test cypress');
 
     cy.get('#availability-body button').first().click();
-    cy.contains(/Đã xóa khung giờ rảnh\.|Da xoa khung gio ranh\./);
+    cy.contains('Đã xóa khung giờ rảnh.');
   });
 
-  it('manages service prices', () => {
+  it('quản lý bảng giá dịch vụ', () => {
     loginUser();
     cy.visit('/companion/dashboard.html');
 
@@ -86,14 +86,14 @@ describe('Companion Flow', () => {
     cy.get('#service-price').type('150');
     cy.get('#service-description').type('mô tả test');
     cy.get('#service-price-form').submit();
-    cy.contains(/Đã thêm bảng giá dịch vụ\.|Da them bang gia dich vu\./);
+    cy.contains('Đã thêm bảng giá dịch vụ.');
     cy.get('#service-price-body').should('contain.text', 'Test service');
 
     cy.get('#service-price-body button').first().click();
-    cy.contains(/Đã xóa bảng giá\.|Da xoa bang gia\./);
+    cy.contains('Đã xóa bảng giá.');
   });
 
-  it('loads workflow, consultations and income widgets', () => {
+  it('tải workflow, tư vấn và thống kê thu nhập', () => {
     loginUser();
     cy.visit('/companion/dashboard.html');
 
@@ -107,7 +107,7 @@ describe('Companion Flow', () => {
     cy.get('#stat-hold').should('exist');
   });
 
-  it('creates withdrawal request (or shows insufficient balance)', () => {
+  it('tạo lệnh rút tiền hoặc báo số dư không đủ', () => {
     loginUser();
     cy.visit('/companion/dashboard.html');
 
@@ -121,10 +121,8 @@ describe('Companion Flow', () => {
       const normalized = text.toLowerCase();
       expect(
         normalized.includes('đã tạo lệnh rút tiền') ||
-        normalized.includes('da tao lenh rut tien') ||
         normalized.includes('insufficient available balance') ||
-        normalized.includes('không thể rút tiền') ||
-        normalized.includes('khong the rut tien')
+        normalized.includes('không thể rút tiền')
       ).to.eq(true);
     });
   });

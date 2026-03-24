@@ -4,17 +4,17 @@ describe('Auth Flow', () => {
   const email = `e2e_${now}@mail.com`;
   const password = '123456';
 
-  it('shows validation on register when confirm password mismatches', () => {
+  it('hiển thị lỗi khi nhập lại mật khẩu không khớp', () => {
     cy.visit('/register');
     cy.get('#username').type(username);
     cy.get('#email').type(email);
     cy.get('#password').type(password);
     cy.get('#confirm-password').type('654321');
     cy.get('#register-form').submit();
-    cy.contains(/Mật khẩu nhập lại không khớp\.|Mat khau nhap lai khong khop\./);
+    cy.contains('Mật khẩu nhập lại không khớp.');
   });
 
-  it('registers a new user successfully', () => {
+  it('đăng ký tài khoản mới thành công', () => {
     cy.visit('/register');
     cy.get('#username').clear().type(username);
     cy.get('#email').clear().type(email);
@@ -23,10 +23,10 @@ describe('Auth Flow', () => {
     cy.get('#register-form').submit();
     cy.url().should('include', '/login');
     cy.url().should('include', 'registered=1');
-    cy.contains(/Đăng ký thành công.*đăng nhập|Dang ky thanh cong.*dang nhap/);
+    cy.contains('Đăng ký thành công');
   });
 
-  it('fails login with wrong password', () => {
+  it('đăng nhập thất bại với mật khẩu sai', () => {
     cy.visit('/login');
     cy.get('#username').type(username);
     cy.get('#password').type('wrongpass');
@@ -35,7 +35,7 @@ describe('Auth Flow', () => {
     cy.url().should('include', 'error=');
   });
 
-  it('logs in with valid credentials and redirects user dashboard', () => {
+  it('đăng nhập thành công và chuyển về dashboard user', () => {
     cy.visit('/login');
     cy.get('#username').clear().type(username);
     cy.get('#password').clear().type(password);
@@ -44,7 +44,7 @@ describe('Auth Flow', () => {
     cy.url().should('include', 'loginSuccess=1');
   });
 
-  it('supports legacy /user/login URL without 404', () => {
+  it('hỗ trợ URL legacy /user/login không bị 404', () => {
     cy.visit('/user/login');
     cy.url().should('include', '/login');
   });

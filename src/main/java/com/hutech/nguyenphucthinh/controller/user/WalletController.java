@@ -39,7 +39,7 @@ public class WalletController {
         User user = walletService.deposit(userId, BigDecimal.valueOf(amount.doubleValue()), provider);
         Map<String, Object> payload = new HashMap<>();
         payload.put("balance", user.getBalance());
-        payload.put("message", "Nap tien thanh cong");
+        payload.put("message", "Nạp tiền thành công");
         return payload;
     }
 

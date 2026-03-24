@@ -50,21 +50,21 @@ function renderTopNav(auth) {
 
     const authPart = auth.authenticated
         ? `
-            <span class="navbar-text me-3">Xin chao, <strong>${escapeHtml(auth.username)}</strong></span>
-            <button id="logout-btn" class="btn btn-outline-danger btn-sm">Dang xuat</button>
+            <span class="navbar-text me-3">Xin chào, <strong>${escapeHtml(auth.username)}</strong></span>
+            <button id="logout-btn" class="btn btn-outline-danger btn-sm">Đăng xuất</button>
         `
         : `
-            <a class="btn btn-outline-primary btn-sm me-2" href="/user/login.html">Dang nhap</a>
-            <a class="btn btn-primary btn-sm" href="/user/register.html">Dang ky</a>
+            <a class="btn btn-outline-primary btn-sm me-2" href="/user/login.html">Đăng nhập</a>
+            <a class="btn btn-primary btn-sm" href="/user/register.html">Đăng ký</a>
         `;
 
     nav.innerHTML = `
-        <a class="btn btn-link text-decoration-none" href="/user/index.html">Trang chu</a>
-        <a class="btn btn-link text-decoration-none" href="/user/search.html">Tim kiem</a>
-        <a class="btn btn-link text-decoration-none" href="/user/appointments.html">Lich hen</a>
-        <a class="btn btn-link text-decoration-none" href="/user/favorites.html">Yeu thich</a>
-        <a class="btn btn-link text-decoration-none" href="/user/review.html">Danh gia</a>
-        <a class="btn btn-link text-decoration-none" href="/user/report.html">To cao</a>
+        <a class="btn btn-link text-decoration-none" href="/user/index.html">Trang chủ</a>
+        <a class="btn btn-link text-decoration-none" href="/user/search.html">Tìm kiếm</a>
+        <a class="btn btn-link text-decoration-none" href="/user/appointments.html">Lịch hẹn</a>
+        <a class="btn btn-link text-decoration-none" href="/user/favorites.html">Yêu thích</a>
+        <a class="btn btn-link text-decoration-none" href="/user/review.html">Đánh giá</a>
+        <a class="btn btn-link text-decoration-none" href="/user/report.html">Tố cáo</a>
         ${authPart}
     `;
 
@@ -79,13 +79,13 @@ function renderTopNav(auth) {
 
 function companionCard(companion, showActions) {
     const name = companion.user?.fullName || companion.user?.username || "Unknown";
-    const bio = companion.bio || "Chua co mo ta";
-    const availability = companion.availability || "Chua cap nhat";
+    const bio = companion.bio || "Chưa có mô tả";
+    const availability = companion.availability || "Chưa cập nhật";
     const actions = showActions
         ? `
             <div class="d-grid gap-2">
-                <a class="btn btn-outline-primary btn-sm" href="/user/profile.html?id=${companion.id}">Xem chi tiet</a>
-                <a class="btn btn-primary btn-sm" href="/user/booking.html?id=${companion.id}">Dat lich</a>
+                <a class="btn btn-outline-primary btn-sm" href="/user/profile.html?id=${companion.id}">Xem chi tiết</a>
+                <a class="btn btn-primary btn-sm" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
             </div>
         `
         : "";
@@ -110,12 +110,12 @@ async function initCompanionGrid(targetId) {
         const response = await apiFetch("/api/companions");
         const companions = await response.json();
         if (!companions.length) {
-            container.innerHTML = '<div class="alert alert-info">Chua co companion.</div>';
+            container.innerHTML = '<div class="alert alert-info">Chưa có companion.</div>';
             return;
         }
         container.innerHTML = companions.map((c) => companionCard(c, true)).join("");
     } catch (error) {
-        container.innerHTML = '<div class="alert alert-danger">Khong tai duoc danh sach companion.</div>';
+        container.innerHTML = '<div class="alert alert-danger">Không tải được danh sách companion.</div>';
     }
 }
 

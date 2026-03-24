@@ -1,4 +1,4 @@
-describe('Nghiệp vụ E2E cho 3 role', () => {
+describe('Nghiệp vụ E2E cho 3 vai trò', () => {
   const now = Date.now();
   const customer = {
     username: `e2e_customer_${now}`,
@@ -97,7 +97,7 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
     cy.get('#depositAmount').clear().type('200000');
     cy.get('#provider').select('MOMO');
     cy.get('#deposit-form').submit();
-    cy.get('#wallet-message').invoke('text').should('match', /Nạp tiền thành công|Nap tien thanh cong/);
+    cy.get('#wallet-message').invoke('text').should('contain', 'Nạp tiền thành công');
     cy.get('#wallet-transactions').find('tr').should('have.length.greaterThan', 0);
 
     resolveCompanionInfo().then(() => {
@@ -108,7 +108,7 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
 
       cy.visit('/user/profile.html?id=' + state.companionId);
       cy.get('#add-favorite-btn').click();
-      cy.get('#profile-message').invoke('text').should('match', /Đã thêm vào yêu thích|Da them vao yeu thich/);
+      cy.get('#profile-message').invoke('text').should('contain', 'Đã thêm vào yêu thích');
 
       cy.visit('/user/booking.html?id=' + state.companionId);
       cy.get('#duration').clear().type('60');
@@ -130,7 +130,7 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
       cy.get('#reason').type('Companion đến trễ');
       cy.get('#isEmergency').check({ force: true });
       cy.get('#report-form').submit();
-      cy.get('#report-message').invoke('text').should('match', /Gửi tố cáo thành công|Gui to cao thanh cong/);
+      cy.get('#report-message').invoke('text').should('contain', 'Gửi tố cáo thành công');
       cy.get('#report-list').find('.card').should('have.length.greaterThan', 0);
     });
   });
@@ -176,7 +176,7 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
     cy.contains('#booking-body tr', customer.username).within(() => {
       cy.contains('button', 'Rate User').click();
     });
-    cy.get('#alert-box').invoke('text').should('match', /Đã đánh giá user|Da danh gia user/);
+    cy.get('#alert-box').invoke('text').should('contain', 'Đã đánh giá user');
 
     cy.get('#withdraw-amount').clear().type('1');
     cy.get('#bank-name').clear().type('VCB');
@@ -186,10 +186,8 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
     cy.get('#alert-box .alert').invoke('text').then((text) => {
       const normalized = text.toLowerCase();
       expect(
-        normalized.includes('đã tạo lệnh rút tiền') ||
-          normalized.includes('da tao lenh rut tien') ||
+          normalized.includes('đã tạo lệnh rút tiền') ||
           normalized.includes('không thể rút tiền') ||
-          normalized.includes('khong the rut tien') ||
           normalized.includes('insufficient available balance')
       ).to.eq(true);
     });
@@ -212,11 +210,11 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
     cy.get('#call-info').should('contain.text', 'VoIP room');
 
     cy.visit('/user/review.html');
-    cy.get('#bookingId').invoke('text').should('not.match', /Không có lịch hẹn đã hoàn thành|Khong co lich hen da hoan thanh/);
+    cy.get('#bookingId').invoke('text').should('not.contain', 'Không có lịch hẹn đã hoàn thành');
     cy.get('#rating-stars .star-btn[data-value="5"]').click();
     cy.get('#comment').type('Trải nghiệm rất tốt');
     cy.get('#review-form').submit();
-    cy.get('#review-message').invoke('text').should('match', /Gửi đánh giá thành công|Gui danh gia thanh cong/);
+    cy.get('#review-message').invoke('text').should('contain', 'Gửi đánh giá thành công');
     cy.get('#review-list').should('contain.text', 'Trải nghiệm rất tốt');
   });
 
@@ -241,7 +239,7 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
         cy.contains('#moderation-pending-body tr', companion.username).within(() => {
           cy.contains('button', 'Cap tich xanh').click();
         });
-        cy.get('#admin-alert').invoke('text').should('match', /Đã cấp tích xanh|Da cap tich xanh/);
+        cy.get('#admin-alert').invoke('text').should('contain', 'Đã cấp tích xanh');
       }
     });
 
@@ -252,15 +250,15 @@ describe('Nghiệp vụ E2E cho 3 role', () => {
     cy.get('#withdrawals-body').then(($tbody) => {
       if ($tbody.text().includes('Duyet')) {
         cy.get('#withdrawals-body button[data-action="approve"]').first().click();
-        cy.get('#admin-alert').invoke('text').should('match', /Đã duyệt lệnh rút tiền|Da duyet lenh rut tien/);
+        cy.get('#admin-alert').invoke('text').should('contain', 'Đã duyệt lệnh rút tiền');
       }
     });
 
     cy.visit('/admin/disputes.html');
     cy.get('#disputes-body').then(($tbody) => {
-      if (!$tbody.text().includes('Khong co tranh chap') && !$tbody.text().includes('Không có tranh chấp')) {
+      if (!$tbody.text().includes('Không có tranh chấp')) {
         cy.get('#disputes-body button[data-action="freeze"]').first().click();
-        cy.get('#admin-alert').invoke('text').should('match', /Đã cập nhật xử lý tranh chấp|Da cap nhat xu ly tranh chap/);
+        cy.get('#admin-alert').invoke('text').should('contain', 'Đã cập nhật xử lý tranh chấp');
       }
     });
   });
