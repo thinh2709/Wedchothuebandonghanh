@@ -1,0 +1,11 @@
+package com.hutech.nguyenphucthinh.repository;
+
+import com.hutech.nguyenphucthinh.model.Booking;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface BookingRepository extends JpaRepository<Booking, Long> {
+    List<Booking> findByCustomerIdOrderByBookingTimeDesc(Long customerId);
+    List<Booking> findByCompanionIdOrderByBookingTimeDesc(Long companionId);
+    long countByCompanionIdAndStatus(Long companionId, Booking.Status status);
+}

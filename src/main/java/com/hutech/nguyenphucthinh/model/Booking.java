@@ -1,0 +1,40 @@
+package com.hutech.nguyenphucthinh.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "bookings")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Booking {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "customer_id", nullable = false)
+    private User customer;
+
+    @ManyToOne
+    @JoinColumn(name = "companion_id", nullable = false)
+    private Companion companion;
+
+    @Column(nullable = false)
+    private LocalDateTime bookingTime;
+
+    @Column(nullable = false)
+    private Integer duration; // in minutes
+
+    @Enumerated(EnumType.STRING)
+    private Status status = Status.PENDING;
+
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    public enum Status {
+        PENDING, ACCEPTED, REJECTED, COMPLETED
+    }
+}

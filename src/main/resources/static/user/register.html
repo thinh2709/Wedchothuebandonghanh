@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dang ky User</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <h1>Dang ky tai khoan</h1>
+    <p id="register-message" style="max-width: 400px; margin: 0 auto 1rem; text-align: center; font-weight: bold; color: red;"></p>
+    <form action="/register" method="post">
+        <div>
+            <label for="username">Ten nguoi dung:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div>
+            <label for="password">Mat khau:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <button type="submit">Dang ky</button>
+    </form>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const messageEl = document.getElementById('register-message');
+        if (messageEl && params.get('error')) {
+            messageEl.textContent = params.get('error');
+        }
+    </script>
+</body>
+</html>
