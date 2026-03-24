@@ -12,6 +12,7 @@
         #chat-thread-list .list-group-item-action { border-radius: 0; transition: all 0.15s ease; }
         #chat-thread-list .list-group-item-action:hover { background: linear-gradient(135deg, #eff6ff, #eef2ff); }
         #chat-thread-list .list-group-item-action.bg-light { background: linear-gradient(135deg, #eff6ff, #eef2ff) !important; border-left: 3px solid #3b82f6; }
+        #live-map-canvas { min-height: 220px; z-index: 1; }
     </style>
 </head>
 <body data-page="chat" class="bg-light">
@@ -46,6 +47,13 @@
                         <button id="call-btn" class="btn btn-outline-success btn-sm"><i class="bi bi-telephone-fill me-1"></i>Lấy thông tin Call</button>
                     </div>
                     <div id="call-info" class="mb-3"></div>
+                    <div id="live-location-panel" class="border rounded-3 p-3 mb-3 bg-white small">
+                        <div class="fw-semibold mb-2 text-primary"><i class="bi bi-broadcast-pin me-1"></i>Vị trí realtime</div>
+                        <div id="live-location-details" class="text-muted">Chọn cuộc trò chuyện có đơn đang nhận hoặc đang diễn ra để xem vị trí đối phương.</div>
+                        <div id="live-map-wrap" class="mt-2" style="display:none">
+                            <div id="live-map-canvas" class="rounded border bg-light" style="height:240px;width:100%"></div>
+                        </div>
+                    </div>
                     <div id="chat-list" class="border rounded-3 p-3 mb-3" style="height: 340px; overflow: auto;"></div>
                     <form id="chat-form" class="input-group">
                         <input id="chat-content" class="form-control" placeholder="Nhập tin nhắn...">

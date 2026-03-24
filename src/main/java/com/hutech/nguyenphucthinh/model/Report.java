@@ -31,6 +31,13 @@ public class Report {
 
     private Boolean emergency = false;
 
+    /** Booking liên quan (nếu khách gửi từ link SOS có bookingId). */
+    private Long relatedBookingId;
+
+    private Double reporterLatitude;
+
+    private Double reporterLongitude;
+
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
 

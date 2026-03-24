@@ -7,15 +7,16 @@ import com.hutech.nguyenphucthinh.model.Consultation;
 import com.hutech.nguyenphucthinh.model.ServicePrice;
 import com.hutech.nguyenphucthinh.model.Withdrawal;
 import com.hutech.nguyenphucthinh.service.companion.CompanionService;
+import com.hutech.nguyenphucthinh.util.RequestBodyParseUtil;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/companions")
@@ -43,8 +44,10 @@ public class CompanionController {
     }
 
     @GetMapping("/{id}")
-    public Optional<Companion> getCompanionById(@PathVariable Long id) {
-        return companionService.getCompanionById(id);
+    public ResponseEntity<Companion> getCompanionById(@PathVariable Long id) {
+        return companionService.getCompanionById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}/service-prices")
@@ -66,6 +69,7 @@ public class CompanionController {
                 request.getOrDefault("availability", ""),
                 request.getOrDefault("serviceType", ""),
                 request.getOrDefault("area", ""),
+                request.getOrDefault("rentalVenues", ""),
                 request.getOrDefault("gender", ""),
                 request.getOrDefault("gameRank", ""),
                 Boolean.parseBoolean(request.getOrDefault("onlineStatus", "false")),
@@ -91,20 +95,7 @@ public class CompanionController {
         if (userId == null) {
             throw new RuntimeException("Please login first");
         }
-        return companionService.updateProfile(
-                userId,
-                request.getOrDefault("bio", ""),
-                request.getOrDefault("hobbies", ""),
-                request.getOrDefault("appearance", ""),
-                request.getOrDefault("availability", ""),
-                request.getOrDefault("serviceType", ""),
-                request.getOrDefault("area", ""),
-                request.getOrDefault("gender", ""),
-                request.getOrDefault("gameRank", ""),
-                Boolean.parseBoolean(request.getOrDefault("onlineStatus", "false")),
-                request.getOrDefault("avatarUrl", ""),
-                request.getOrDefault("introVideoUrl", "")
-        );
+        return companionService.updateProfile(userId, request);
     }
 
     @PutMapping("/me/identity")
@@ -203,7 +194,7 @@ public class CompanionController {
     }
 
     @PostMapping("/me/bookings/{bookingId}/checkin")
-    public Booking checkIn(@PathVariable Long bookingId, @RequestBody Map<String, String> request, HttpSession session) {
+    public Booking checkIn(@PathVariable Long bookingId, @RequestBody Map<String, Object> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         if (userId == null) {
             throw new RuntimeException("Please login first");
@@ -211,13 +202,13 @@ public class CompanionController {
         return companionService.checkIn(
                 userId,
                 bookingId,
-                request.get("lat") == null ? null : Double.valueOf(request.get("lat")),
-                request.get("lng") == null ? null : Double.valueOf(request.get("lng"))
+                RequestBodyParseUtil.readDouble(request, "lat"),
+                RequestBodyParseUtil.readDouble(request, "lng")
         );
     }
 
     @PostMapping("/me/bookings/{bookingId}/checkout")
-    public Booking checkOut(@PathVariable Long bookingId, @RequestBody Map<String, String> request, HttpSession session) {
+    public Booking checkOut(@PathVariable Long bookingId, @RequestBody Map<String, Object> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         if (userId == null) {
             throw new RuntimeException("Please login first");
@@ -225,13 +216,13 @@ public class CompanionController {
         return companionService.checkOut(
                 userId,
                 bookingId,
-                request.get("lat") == null ? null : Double.valueOf(request.get("lat")),
-                request.get("lng") == null ? null : Double.valueOf(request.get("lng"))
+                RequestBodyParseUtil.readDouble(request, "lat"),
+                RequestBodyParseUtil.readDouble(request, "lng")
         );
     }
 
     @PostMapping("/me/bookings/{bookingId}/sos")
-    public Booking triggerSos(@PathVariable Long bookingId, @RequestBody Map<String, String> request, HttpSession session) {
+    public Booking triggerSos(@PathVariable Long bookingId, @RequestBody Map<String, Object> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         if (userId == null) {
             throw new RuntimeException("Please login first");
@@ -239,9 +230,9 @@ public class CompanionController {
         return companionService.triggerSos(
                 userId,
                 bookingId,
-                request.getOrDefault("note", ""),
-                request.get("lat") == null ? null : Double.valueOf(request.get("lat")),
-                request.get("lng") == null ? null : Double.valueOf(request.get("lng"))
+                RequestBodyParseUtil.readString(request, "note", ""),
+                RequestBodyParseUtil.readDouble(request, "lat"),
+                RequestBodyParseUtil.readDouble(request, "lng")
         );
     }
 

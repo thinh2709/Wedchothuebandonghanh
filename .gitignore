@@ -34,6 +34,9 @@ cypress/downloads/
 .env
 .env.*
 
+# Keystore HTTPS dev LAN (application-https-lan.properties)
+dev-lan.p12
+
 # Optional local settings
 *.local
 HELP.md

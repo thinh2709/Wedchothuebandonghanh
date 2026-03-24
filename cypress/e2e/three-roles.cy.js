@@ -90,6 +90,7 @@ describe('Nghiệp vụ E2E chi tiết cho 3 role', () => {
         availability: 'Tối thứ 2-6',
         serviceType: 'Tâm sự',
         area: 'Quận 1',
+        rentalVenues: 'Quán cafe trung tâm\nCông viên Lê Văn Tám',
         gender: 'Nữ',
         gameRank: 'Kim cương',
         onlineStatus: 'true',
@@ -146,7 +147,8 @@ describe('Nghiệp vụ E2E chi tiết cho 3 role', () => {
     cy.get('#booking-service-price-hint').invoke('text').should('not.equal', '');
     cy.get('#bookingTime').type('2030-12-31T20:00');
     cy.get('#duration').clear().type('60');
-    cy.get('#location').clear().type('Quận 1');
+    cy.get('#locationEnabled').uncheck({ force: true });
+    cy.get('#rentalVenue').select('Quán cafe trung tâm');
     cy.get('#note').clear().type('Booking từ Cypress - 3 role');
     cy.get('#booking-form').submit();
     cy.wait('@createBookingApi').its('response.statusCode').should('eq', 200);

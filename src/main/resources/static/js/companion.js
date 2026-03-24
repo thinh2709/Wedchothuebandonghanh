@@ -1,5 +1,11 @@
-async function getJson(url, options) {
-    const res = await fetch(url, options);
+async function getJson(url, options = {}) {
+    const res = await fetch(url, {
+        credentials: 'same-origin',
+        ...options,
+        headers: {
+            ...(options.headers || {})
+        }
+    });
     if (!res.ok) {
         const text = await res.text();
         let message = text;
@@ -219,6 +225,60 @@ function getCurrentLocation() {
     });
 }
 
+let companionLeafletLoadPromise = null;
+function ensureLeafletLoadedCompanion() {
+    if (window.L) return Promise.resolve();
+    if (companionLeafletLoadPromise) return companionLeafletLoadPromise;
+    companionLeafletLoadPromise = new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.setAttribute('data-app-leaflet', '1');
+        link.onload = () => {
+            const s = document.createElement('script');
+            s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error('Leaflet'));
+            document.head.appendChild(s);
+        };
+        link.onerror = () => reject(new Error('Leaflet CSS'));
+        document.head.appendChild(link);
+    });
+    return companionLeafletLoadPromise;
+}
+
+/** Gửi vị trí định kỳ khi đơn IN_PROGRESS (dashboard companion). */
+const companionDashboardLiveIntervals = new Map();
+
+function startCompanionDashboardLiveShare(bookingId) {
+    const id = Number(bookingId);
+    if (!id || companionDashboardLiveIntervals.has(id)) return;
+    const tick = async () => {
+        try {
+            const loc = await getCurrentLocation();
+            if (loc.lat == null || loc.lng == null) return;
+            await sendJson(`/api/bookings/me/${id}/live-location`, 'POST', { lat: loc.lat, lng: loc.lng });
+        } catch (_) {}
+    };
+    tick();
+    companionDashboardLiveIntervals.set(id, setInterval(tick, 25000));
+}
+
+function stopCompanionDashboardLiveShare(bookingId) {
+    const id = Number(bookingId);
+    const t = companionDashboardLiveIntervals.get(id);
+    if (t) clearInterval(t);
+    companionDashboardLiveIntervals.delete(id);
+}
+
+function syncCompanionDashboardLiveShares(bookings) {
+    const running = new Set((bookings || []).filter(b => b.status === 'IN_PROGRESS').map(b => Number(b.id)));
+    for (const bid of companionDashboardLiveIntervals.keys()) {
+        if (!running.has(bid)) stopCompanionDashboardLiveShare(bid);
+    }
+    running.forEach((bid) => startCompanionDashboardLiveShare(bid));
+}
+
 async function loadProfile() {
     try {
         const profile = await getJson('/api/companions/me/profile');
@@ -228,20 +288,25 @@ async function loadProfile() {
         document.getElementById('availability-text').value = profile.availability || '';
         document.getElementById('service-type').value = profile.serviceType || '';
         document.getElementById('area').value = profile.area || '';
+        const rv = document.getElementById('rental-venues');
+        if (rv) rv.value = profile.rentalVenues || '';
         document.getElementById('identity-number').value = profile.identityNumber || '';
         document.getElementById('identity-image-url').value = profile.identityImageUrl || '';
         document.getElementById('portrait-image-url').value = profile.portraitImageUrl || '';
         document.getElementById('intro-media-urls').value = profile.introMediaUrls || '';
         document.getElementById('skills').value = profile.skills || '';
-        document.getElementById('online-toggle').checked = !!profile.online;
+        document.getElementById('online-toggle').checked = !!(profile.onlineStatus ?? profile.online);
         const statusEl = document.getElementById('companion-status');
         statusEl.className = `badge ${statusBadgeClass(profile.status)}`;
         statusEl.textContent = profile.status || 'N/A';
-    } catch (_) {
+    } catch (err) {
+        showAlert(`Không thể tải hồ sơ: ${err.message || err}`, 'danger');
         document.getElementById('bio').value = '';
         document.getElementById('hobbies').value = '';
         document.getElementById('appearance').value = '';
         document.getElementById('availability-text').value = '';
+        const rv = document.getElementById('rental-venues');
+        if (rv) rv.value = '';
         const statusEl = document.getElementById('companion-status');
         statusEl.className = 'badge text-bg-secondary';
         statusEl.textContent = 'N/A';
@@ -256,20 +321,26 @@ async function saveProfile(e) {
         appearance: document.getElementById('appearance').value.trim(),
         availability: document.getElementById('availability-text').value.trim(),
         serviceType: document.getElementById('service-type').value.trim(),
-        area: document.getElementById('area').value.trim()
+        area: document.getElementById('area').value.trim(),
+        rentalVenues: (document.getElementById('rental-venues')?.value || '').trim(),
+        onlineStatus: String(document.getElementById('online-toggle').checked)
     };
-    await sendJson('/api/companions/me/profile', 'PUT', payload);
-    await sendJson('/api/companions/me/identity', 'PUT', {
-        identityNumber: document.getElementById('identity-number').value.trim(),
-        identityImageUrl: document.getElementById('identity-image-url').value.trim(),
-        portraitImageUrl: document.getElementById('portrait-image-url').value.trim()
-    });
-    await sendJson('/api/companions/me/media-skills', 'PUT', {
-        introMediaUrls: document.getElementById('intro-media-urls').value.trim(),
-        skills: document.getElementById('skills').value.trim()
-    });
-    showAlert('Đã cập nhật hồ sơ companion.');
-    await loadProfile();
+    try {
+        await sendJson('/api/companions/me/profile', 'PUT', payload);
+        await sendJson('/api/companions/me/identity', 'PUT', {
+            identityNumber: document.getElementById('identity-number').value.trim(),
+            identityImageUrl: document.getElementById('identity-image-url').value.trim(),
+            portraitImageUrl: document.getElementById('portrait-image-url').value.trim()
+        });
+        await sendJson('/api/companions/me/media-skills', 'PUT', {
+            introMediaUrls: document.getElementById('intro-media-urls').value.trim(),
+            skills: document.getElementById('skills').value.trim()
+        });
+        showAlert('Đã cập nhật hồ sơ companion.');
+        await loadProfile();
+    } catch (err) {
+        showAlert(`Không thể lưu hồ sơ: ${err.message || err}`, 'danger');
+    }
 }
 
 async function updateOnlineStatus() {
@@ -352,6 +423,7 @@ async function checkInBooking(bookingId) {
     });
     await loadBookings();
     await loadBookingWorkflow();
+    startCompanionDashboardLiveShare(bookingId);
     showAlert(`Đã check-in booking #${bookingId}.`);
 }
 
@@ -361,6 +433,7 @@ async function checkOutBooking(bookingId) {
         lat: loc.lat,
         lng: loc.lng
     });
+    stopCompanionDashboardLiveShare(bookingId);
     await loadBookings();
     await loadBookingWorkflow();
     await loadIncomeStats();
@@ -508,6 +581,7 @@ async function loadBookings() {
         tr.querySelector('[data-action="sos"]')?.addEventListener('click', () => openSosModal(item));
         rows.appendChild(tr);
     });
+    syncCompanionDashboardLiveShares(bookings);
 }
 
 async function loadBookingWorkflow() {
@@ -933,6 +1007,86 @@ async function initCompanionChatPage() {
     let threads = [];
     let chatStompSub = null;
     let chatPollTimer = null;
+    let liveStompSub = null;
+    let liveGeolocationTimer = null;
+    let companionChatLeafletMap = null;
+    let companionChatLeafletMarker = null;
+
+    function companionChatThreadStatus() {
+        const t = threads.find(x => x.bookingId === currentBookingId);
+        return t ? t.status : null;
+    }
+
+    function tearDownCompanionChatLiveMap() {
+        if (companionChatLeafletMap) {
+            try {
+                companionChatLeafletMap.remove();
+            } catch (_) {}
+            companionChatLeafletMap = null;
+            companionChatLeafletMarker = null;
+        }
+        const wrap = document.getElementById('live-map-wrap');
+        if (wrap) wrap.style.display = 'none';
+    }
+
+    async function paintCompanionChatLiveMap(lat, lng) {
+        const wrap = document.getElementById('live-map-wrap');
+        const canvas = document.getElementById('live-map-canvas');
+        if (!wrap || !canvas || Number.isNaN(lat) || Number.isNaN(lng)) return;
+        await ensureLeafletLoadedCompanion();
+        const L = window.L;
+        if (!L) return;
+        wrap.style.display = 'block';
+        await new Promise(r => requestAnimationFrame(r));
+        if (!companionChatLeafletMap) {
+            companionChatLeafletMap = L.map(canvas).setView([lat, lng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(companionChatLeafletMap);
+            companionChatLeafletMarker = L.marker([lat, lng]).addTo(companionChatLeafletMap);
+        } else {
+            companionChatLeafletMarker.setLatLng([lat, lng]);
+            companionChatLeafletMap.setView([lat, lng], 15);
+            companionChatLeafletMap.invalidateSize();
+        }
+    }
+
+    function renderCompanionLivePanel(data) {
+        const details = document.getElementById('live-location-details');
+        if (!details) return;
+        const st = companionChatThreadStatus();
+        if (!currentBookingId || !st || !['ACCEPTED', 'IN_PROGRESS'].includes(st)) {
+            tearDownCompanionChatLiveMap();
+            details.innerHTML = 'Chỉ khi đơn ACCEPTED / IN_PROGRESS.';
+            return;
+        }
+        if (!data || data.latitude == null || data.longitude == null) {
+            tearDownCompanionChatLiveMap();
+            details.innerHTML = 'Chưa có điểm. Khách cần mở chat và bật định vị.';
+            return;
+        }
+        const roleLabel = data.role === 'COMPANION' ? 'Companion' : data.role === 'CUSTOMER' ? 'Khách' : escapeHtml(data.role || '');
+        const maps = `https://www.google.com/maps?q=${encodeURIComponent(String(data.latitude) + ',' + String(data.longitude))}`;
+        const lat = Number(data.latitude);
+        const lng = Number(data.longitude);
+        details.innerHTML = `<div class="mb-1"><span class="text-secondary fw-semibold">${roleLabel}</span> <span class="text-muted">@${escapeHtml(data.username || '')}</span></div>
+            <div class="font-monospace small mb-1">${escapeHtml(String(lat))}, ${escapeHtml(String(lng))}</div>
+            <div class="text-muted small mb-2">${escapeHtml(fmtDateTime(data.at))}</div>
+            <a class="btn btn-sm btn-outline-primary" href="${maps}" target="_blank" rel="noopener">Mở Google Maps</a>`;
+        paintCompanionChatLiveMap(lat, lng).catch(() => {});
+    }
+
+    async function fetchCompanionLiveSnapshot() {
+        const st = companionChatThreadStatus();
+        if (!currentBookingId || !st || !['ACCEPTED', 'IN_PROGRESS'].includes(st)) return;
+        try {
+            const data = await getJson(`/api/bookings/me/${currentBookingId}/live-location`);
+            renderCompanionLivePanel(data);
+        } catch (_) {
+            renderCompanionLivePanel(null);
+        }
+    }
 
     async function resubscribeChatSocket() {
         if (chatStompSub && typeof chatStompSub.unsubscribe === 'function') {
@@ -948,6 +1102,38 @@ async function initCompanionChatPage() {
         } catch (e) {
             console.warn('WebSocket chat không khả dụng', e);
         }
+    }
+
+    async function resubscribeCompanionLiveSocket() {
+        if (liveStompSub && typeof liveStompSub.unsubscribe === 'function') {
+            try { liveStompSub.unsubscribe(); } catch (_) {}
+            liveStompSub = null;
+        }
+        if (liveGeolocationTimer) {
+            clearInterval(liveGeolocationTimer);
+            liveGeolocationTimer = null;
+        }
+        const st = companionChatThreadStatus();
+        if (!currentBookingId || !window.RealtimeStomp || !st || !['ACCEPTED', 'IN_PROGRESS'].includes(st)) {
+            renderCompanionLivePanel(null);
+            return;
+        }
+        await fetchCompanionLiveSnapshot();
+        try {
+            await RealtimeStomp.connect();
+            liveStompSub = await RealtimeStomp.subscribeBookingLocation(currentBookingId, (payload) => renderCompanionLivePanel(payload));
+        } catch (e) {
+            console.warn('WebSocket vị trí không khả dụng', e);
+        }
+        const pushLoc = async () => {
+            const loc = await getCurrentLocation();
+            if (loc.lat == null || loc.lng == null) return;
+            try {
+                await sendJson(`/api/bookings/me/${currentBookingId}/live-location`, 'POST', { lat: loc.lat, lng: loc.lng });
+            } catch (_) {}
+        };
+        pushLoc();
+        liveGeolocationTimer = setInterval(pushLoc, 25000);
     }
 
     function updateThreadHeader() {
@@ -1004,6 +1190,8 @@ async function initCompanionChatPage() {
                 updateThreadHeader();
                 renderThreadList();
                 await loadMessages();
+                await resubscribeChatSocket();
+                await resubscribeCompanionLiveSocket();
             });
         });
     }
@@ -1062,7 +1250,8 @@ async function initCompanionChatPage() {
         if (!box) return;
         try {
             const info = await getJson(`/api/chat/${currentBookingId}/call`);
-            box.innerHTML = `<div class="alert alert-success mb-0">VoIP room: <strong>${escapeHtml(info.roomId)}</strong> | token: ${escapeHtml(info.token)}</div>`;
+            const contactPhone = info.contactPhone || info.customerPhone || '-';
+            box.innerHTML = `<div class="alert alert-success mb-0">VoIP room: <strong>${escapeHtml(info.roomId)}</strong> | token: ${escapeHtml(info.token)}<br><strong>SĐT liên hệ:</strong> ${escapeHtml(contactPhone)}</div>`;
         } catch (err) {
             box.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message || 'Không thể lấy thông tin call')}</div>`;
         }
@@ -1077,6 +1266,7 @@ async function initCompanionChatPage() {
         try {
             await RealtimeStomp.ensureLibs();
             await resubscribeChatSocket();
+            await resubscribeCompanionLiveSocket();
             if (!chatStompSub) {
                 chatPollTimer = setInterval(loadMessages, 3000);
             }
@@ -1086,6 +1276,7 @@ async function initCompanionChatPage() {
         }
     } else {
         chatPollTimer = setInterval(loadMessages, 3000);
+        await fetchCompanionLiveSnapshot();
     }
 }
 

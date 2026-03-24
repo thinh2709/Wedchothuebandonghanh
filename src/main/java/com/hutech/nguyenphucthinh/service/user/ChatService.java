@@ -69,10 +69,17 @@ public class ChatService {
     public Map<String, Object> generateCallInfo(Long userId, Long bookingId) {
         Booking booking = getAuthorizedBooking(userId, bookingId);
         Map<String, Object> payload = new HashMap<>();
+        boolean requesterIsCustomer = booking.getCustomer().getId().equals(userId);
+        User companionUser = booking.getCompanion().getUser();
+        User customerUser = booking.getCustomer();
+        User contactUser = requesterIsCustomer ? companionUser : customerUser;
         payload.put("roomId", "booking-room-" + bookingId);
         payload.put("token", "internal-demo-token-" + userId + "-" + bookingId);
         payload.put("provider", "INTERNAL_DEMO_VOIP");
         payload.put("bookingStatus", booking.getStatus().name());
+        payload.put("companionPhone", companionUser != null ? companionUser.getPhoneNumber() : null);
+        payload.put("customerPhone", customerUser != null ? customerUser.getPhoneNumber() : null);
+        payload.put("contactPhone", contactUser != null ? contactUser.getPhoneNumber() : null);
         return payload;
     }
 }

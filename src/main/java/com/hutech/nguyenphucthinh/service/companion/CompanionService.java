@@ -28,8 +28,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -80,7 +80,7 @@ public class CompanionService {
     }
 
     public Companion registerCompanion(Long userId, String bio, String hobbies, String appearance, String availability,
-                                       String serviceType, String area, String gender, String gameRank,
+                                       String serviceType, String area, String rentalVenues, String gender, String gameRank,
                                        Boolean onlineStatus, String avatarUrl, String introVideoUrl) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
         if (user.getRole() != User.Role.COMPANION) {
@@ -99,6 +99,7 @@ public class CompanionService {
         companion.setAvailability(availability);
         companion.setServiceType(serviceType);
         companion.setArea(area);
+        companion.setRentalVenues(rentalVenues);
         companion.setGender(gender);
         companion.setGameRank(gameRank);
         companion.setOnlineStatus(Boolean.TRUE.equals(onlineStatus));
@@ -112,21 +113,45 @@ public class CompanionService {
         return companionRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ companion"));
     }
 
-    public Companion updateProfile(Long userId, String bio, String hobbies, String appearance, String availability,
-                                   String serviceType, String area, String gender, String gameRank,
-                                   Boolean onlineStatus, String avatarUrl, String introVideoUrl) {
+    /** Chỉ cập nhật các field có trong request (tránh ghi đè mất dữ liệu khi client gửi thiếu key). */
+    public Companion updateProfile(Long userId, Map<String, String> request) {
         Companion companion = getCompanionByUserId(userId);
-        companion.setBio(bio);
-        companion.setHobbies(hobbies);
-        companion.setAppearance(appearance);
-        companion.setAvailability(availability);
-        companion.setServiceType(serviceType);
-        companion.setArea(area);
-        companion.setGender(gender);
-        companion.setGameRank(gameRank);
-        companion.setOnlineStatus(Boolean.TRUE.equals(onlineStatus));
-        companion.setAvatarUrl(avatarUrl);
-        companion.setIntroVideoUrl(introVideoUrl);
+        if (request.containsKey("bio")) {
+            companion.setBio(request.get("bio"));
+        }
+        if (request.containsKey("hobbies")) {
+            companion.setHobbies(request.get("hobbies"));
+        }
+        if (request.containsKey("appearance")) {
+            companion.setAppearance(request.get("appearance"));
+        }
+        if (request.containsKey("availability")) {
+            companion.setAvailability(request.get("availability"));
+        }
+        if (request.containsKey("serviceType")) {
+            companion.setServiceType(request.get("serviceType"));
+        }
+        if (request.containsKey("area")) {
+            companion.setArea(request.get("area"));
+        }
+        if (request.containsKey("rentalVenues")) {
+            companion.setRentalVenues(request.get("rentalVenues"));
+        }
+        if (request.containsKey("gender")) {
+            companion.setGender(request.get("gender"));
+        }
+        if (request.containsKey("gameRank")) {
+            companion.setGameRank(request.get("gameRank"));
+        }
+        if (request.containsKey("onlineStatus")) {
+            companion.setOnlineStatus(Boolean.parseBoolean(request.get("onlineStatus")));
+        }
+        if (request.containsKey("avatarUrl")) {
+            companion.setAvatarUrl(request.get("avatarUrl"));
+        }
+        if (request.containsKey("introVideoUrl")) {
+            companion.setIntroVideoUrl(request.get("introVideoUrl"));
+        }
         return companionRepository.save(companion);
     }
 
@@ -274,6 +299,10 @@ public class CompanionService {
         booking.setCheckOutLatitude(lat);
         booking.setCheckOutLongitude(lng);
         booking.setCompletedAt(LocalDateTime.now());
+        booking.setLiveLatitude(null);
+        booking.setLiveLongitude(null);
+        booking.setLiveLocationAt(null);
+        booking.setLiveLocationRole(null);
         booking.setStatus(Booking.Status.COMPLETED);
 
         Transaction tx = new Transaction();
@@ -299,20 +328,23 @@ public class CompanionService {
         if (!booking.getCompanion().getId().equals(companion.getId())) {
             throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
         }
+        if (booking.getStatus() != Booking.Status.ACCEPTED && booking.getStatus() != Booking.Status.IN_PROGRESS) {
+            throw new RuntimeException("Chỉ kích hoạt SOS khi đơn đang ACCEPTED hoặc IN_PROGRESS");
+        }
         booking.setSosTriggered(true);
         booking.setSosNote(note);
         booking.setCheckInLatitude(lat);
         booking.setCheckInLongitude(lng);
+        String noteTail = note == null || note.isBlank() ? "" : (" Chi tiết: " + note.trim());
         notificationService.create(
                 booking.getCustomer().getId(),
                 "Cảnh báo SOS từ companion",
-                "Companion đã kích hoạt SOS cho đơn #" + booking.getId() + ". Vui lòng giữ liên lạc ngay."
+                "Companion đã kích hoạt SOS cho đơn #" + booking.getId() + ". Vui lòng giữ liên lạc ngay." + noteTail
         );
         userRepository.findByRole(User.Role.ADMIN).forEach(admin -> notificationService.create(
                 admin.getId(),
                 "SOS KHẨN CẤP",
-                "Companion #" + companion.getId() + " đã kích hoạt SOS tại đơn #" + booking.getId()
-                        + (note == null || note.isBlank() ? "" : (". Ghi chú: " + note.trim()))
+                "Companion #" + companion.getId() + " đã kích hoạt SOS tại đơn #" + booking.getId() + noteTail
         ));
         return bookingRepository.save(booking);
     }

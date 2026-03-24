@@ -35,4 +35,9 @@ public class RealtimeBroadcastService {
         Long userId = n.getUser().getId();
         messagingTemplate.convertAndSend("/topic/notifications.user." + userId, (Object) payload);
     }
+
+    /** Đồng bộ vị trí realtime giữa khách — companion (cùng booking). */
+    public void publishBookingLiveLocation(long bookingId, Map<String, Object> payload) {
+        messagingTemplate.convertAndSend("/topic/location.booking." + bookingId, (Object) payload);
+    }
 }

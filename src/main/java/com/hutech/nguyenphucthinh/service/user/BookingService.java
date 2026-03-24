@@ -9,6 +9,7 @@ import com.hutech.nguyenphucthinh.repository.BookingRepository;
 import com.hutech.nguyenphucthinh.repository.CompanionRepository;
 import com.hutech.nguyenphucthinh.repository.ServicePriceRepository;
 import com.hutech.nguyenphucthinh.repository.TransactionRepository;
+import com.hutech.nguyenphucthinh.realtime.RealtimeBroadcastService;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static com.hutech.nguyenphucthinh.util.RentalVenuesUtil.parse;
 
 @Service
 public class BookingService {
@@ -37,6 +42,8 @@ public class BookingService {
     private WalletService walletService;
     @Autowired
     private NotificationService notificationService;
+    @Autowired
+    private RealtimeBroadcastService realtimeBroadcastService;
 
     private BigDecimal calculateHoldAmount(BigDecimal pricePerHour, Integer duration) {
         if (pricePerHour == null) pricePerHour = new BigDecimal("200000");
@@ -58,7 +65,7 @@ public class BookingService {
         return startA.isBefore(endB) && startB.isBefore(endA);
     }
 
-    public Booking createBooking(Long customerId, Long companionId, Long servicePriceId, String bookingTime, Integer duration, String location, String note) {
+    public Booking createBooking(Long customerId, Long companionId, Long servicePriceId, String bookingTime, Integer duration, String rentalVenue, String location, String note) {
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng"));
         Companion companion = companionRepository.findById(companionId)
@@ -94,11 +101,21 @@ public class BookingService {
             throw new RuntimeException("Companion đã có yêu cầu khác trong cùng khung giờ. Vui lòng chọn thời gian khác");
         }
 
+        List<String> allowedVenues = parse(companion.getRentalVenues());
+        if (allowedVenues.isEmpty()) {
+            throw new RuntimeException("Companion chưa cấu hình danh sách nơi thuê trong hồ sơ. Vui lòng chọn companion khác hoặc nhắc companion cập nhật hồ sơ.");
+        }
+        String chosenVenue = rentalVenue == null ? "" : rentalVenue.trim();
+        if (chosenVenue.isEmpty() || !allowedVenues.contains(chosenVenue)) {
+            throw new RuntimeException("Vui lòng chọn một nơi thuê hợp lệ từ danh sách companion cung cấp.");
+        }
+
         Booking booking = new Booking();
         booking.setCustomer(customer);
         booking.setCompanion(companion);
         booking.setBookingTime(bookingStart);
         booking.setDuration(duration);
+        booking.setRentalVenue(chosenVenue);
         booking.setLocation(location);
         booking.setServiceName(servicePrice.getServiceName());
         booking.setServicePricePerHour(servicePrice.getPricePerHour());
@@ -178,6 +195,7 @@ public class BookingService {
         if (booking.getStatus() != Booking.Status.IN_PROGRESS) {
             throw new RuntimeException("Đơn phải ở trạng thái IN_PROGRESS trước khi check-out");
         }
+        clearLiveLocationFields(booking);
         booking.setStatus(Booking.Status.COMPLETED);
         Transaction tx = new Transaction();
         tx.setBooking(booking);
@@ -210,5 +228,60 @@ public class BookingService {
         booking.setDuration(booking.getDuration() + extraMinutes);
         booking.setHoldAmount(booking.getHoldAmount().add(extraHold));
         return bookingRepository.save(booking);
+    }
+
+    private Booking requireBookingParticipant(Long userId, Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
+        boolean isCustomer = booking.getCustomer().getId().equals(userId);
+        boolean isCompanion = booking.getCompanion().getUser().getId().equals(userId);
+        if (!isCustomer && !isCompanion) {
+            throw new RuntimeException("Bạn không có quyền truy cập đơn đặt lịch này");
+        }
+        return booking;
+    }
+
+    private static void clearLiveLocationFields(Booking booking) {
+        booking.setLiveLatitude(null);
+        booking.setLiveLongitude(null);
+        booking.setLiveLocationAt(null);
+        booking.setLiveLocationRole(null);
+    }
+
+    public Map<String, Object> updateLiveLocation(Long userId, Long bookingId, Double lat, Double lng) {
+        if (lat == null || lng == null) {
+            throw new RuntimeException("lat và lng là bắt buộc");
+        }
+        Booking booking = requireBookingParticipant(userId, bookingId);
+        if (booking.getStatus() != Booking.Status.ACCEPTED && booking.getStatus() != Booking.Status.IN_PROGRESS) {
+            throw new RuntimeException("Chỉ chia sẻ vị trí khi đơn ACCEPTED hoặc IN_PROGRESS");
+        }
+        boolean isCustomer = booking.getCustomer().getId().equals(userId);
+        User u = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+        booking.setLiveLatitude(lat);
+        booking.setLiveLongitude(lng);
+        booking.setLiveLocationAt(LocalDateTime.now());
+        booking.setLiveLocationRole(isCustomer ? "CUSTOMER" : "COMPANION");
+        bookingRepository.save(booking);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("bookingId", bookingId);
+        payload.put("latitude", lat);
+        payload.put("longitude", lng);
+        payload.put("at", booking.getLiveLocationAt().toString());
+        payload.put("role", booking.getLiveLocationRole());
+        payload.put("username", u.getUsername());
+        realtimeBroadcastService.publishBookingLiveLocation(bookingId, payload);
+        return payload;
+    }
+
+    public Map<String, Object> getLiveLocation(Long userId, Long bookingId) {
+        Booking booking = requireBookingParticipant(userId, bookingId);
+        Map<String, Object> m = new HashMap<>();
+        m.put("bookingId", bookingId);
+        m.put("latitude", booking.getLiveLatitude());
+        m.put("longitude", booking.getLiveLongitude());
+        m.put("at", booking.getLiveLocationAt() != null ? booking.getLiveLocationAt().toString() : null);
+        m.put("role", booking.getLiveLocationRole());
+        return m;
     }
 }

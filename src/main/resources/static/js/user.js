@@ -24,6 +24,93 @@ function formatDateTime(value) {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString("vi-VN");
 }
 
+/** Giống backend RentalVenuesUtil: mỗi dòng là một nơi thuê. */
+function parseRentalVenuesLines(text) {
+    return String(text || "")
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
+/** Một số phiên bản Spring có thể serialize Optional thành { present, value }. */
+function unwrapOptionalEntity(data) {
+    if (data && typeof data === "object" && "value" in data && data.value != null && typeof data.value === "object" && "id" in data.value) {
+        return data.value;
+    }
+    return data;
+}
+
+async function reporterIsLikelyDenied() {
+    try {
+        if (!navigator.permissions || !navigator.permissions.query) return false;
+        const st = await navigator.permissions.query({ name: "geolocation" });
+        return st.state === "denied";
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Lấy tọa độ thiết bị (khách). Thử độ chính xác cao trước, lỗi/hết giờ thì thử mạng/Wi‑Fi.
+ * Quan trọng: getCurrentPosition được gọi ngay trong executor Promise (không await trước đó),
+ * để còn “user gesture” — trình duyệt mới hiện hỏi cấp quyền vị trí.
+ */
+function getReporterGps() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve({ lat: null, lng: null });
+            return;
+        }
+        const lowAccuracy = () => {
+            navigator.geolocation.getCurrentPosition(
+                (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                () => resolve({ lat: null, lng: null }),
+                { enableHighAccuracy: false, timeout: 22000, maximumAge: 300000 }
+            );
+        };
+        navigator.geolocation.getCurrentPosition(
+            (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+            () => lowAccuracy(),
+            { enableHighAccuracy: true, timeout: 28000, maximumAge: 0 }
+        );
+    });
+}
+
+/**
+ * Gọi trong handler click/change (cùng lượt tương tác) để trình duyệt hỏi quyền sớm khi bật SOS.
+ */
+function primeReporterGeolocationFromGesture() {
+    if (!navigator.geolocation || !window.isSecureContext) return;
+    navigator.geolocation.getCurrentPosition(
+        () => {},
+        () => {},
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+    );
+}
+
+let leafletLoaderPromise = null;
+/** Leaflet + OSM — dùng cho bản đồ vị trí realtime trên chat. */
+function ensureLeafletLoaded() {
+    if (window.L) return Promise.resolve();
+    if (leafletLoaderPromise) return leafletLoaderPromise;
+    leafletLoaderPromise = new Promise((resolve, reject) => {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        link.setAttribute("data-app-leaflet", "1");
+        link.onload = () => {
+            const s = document.createElement("script");
+            s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error("Leaflet"));
+            document.head.appendChild(s);
+        };
+        link.onerror = () => reject(new Error("Leaflet CSS"));
+        document.head.appendChild(link);
+    });
+    return leafletLoaderPromise;
+}
+
 function toDateInputValue(value) {
     const date = value ? new Date(value) : new Date();
     date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
@@ -186,7 +273,8 @@ async function initProfilePage(auth) {
     }
     try {
         const res = await apiFetch(`/api/companions/${id}`);
-        const companion = res.ok ? await res.json() : null;
+        const raw = res.ok ? await res.json() : null;
+        const companion = unwrapOptionalEntity(raw);
         if (!companion || !companion.user) {
             box.innerHTML = `<div class="empty-state">Không tìm thấy companion phù hợp.</div>`;
             return;
@@ -215,6 +303,11 @@ async function initProfilePage(auth) {
               <p><strong>Thời gian rảnh:</strong> ${escapeHtml(companion.availability || "Chưa có")}</p>
               <p><strong>Dịch vụ:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Rank:</strong> ${escapeHtml(companion.gameRank || "-")}</p>
               <p><strong>Khu vực:</strong> ${escapeHtml(companion.area || "-")} | <strong>Giới tính:</strong> ${escapeHtml(companion.gender || "-")}</p>
+              ${
+                  parseRentalVenuesLines(companion.rentalVenues).length
+                      ? `<p><strong>Nơi thuê (gợi ý):</strong><br>${parseRentalVenuesLines(companion.rentalVenues).map((v) => `<span class="badge bg-light text-dark border me-1 mb-1">${escapeHtml(v)}</span>`).join("")}</p>`
+                      : `<p class="text-muted small mb-0"><strong>Nơi thuê:</strong> Companion chưa công bố danh sách trong hồ sơ.</p>`
+              }
               <p><strong>Tỷ lệ phản hồi:</strong> ${Number(companion.responseRate || 0).toFixed(0)}%</p>
               ${companion.introVideoUrl ? `<a class="btn btn-sm btn-outline-dark mb-3" href="${escapeHtml(companion.introVideoUrl)}" target="_blank">Xem video giới thiệu</a>` : ""}
               <div class="d-flex gap-2 flex-wrap">
@@ -288,16 +381,43 @@ async function initBookingPage(auth) {
             setMessage("booking-message", "warning", "Companion này đang offline, vui lòng chọn companion online khác.");
         }
     }
+    const rentalVenueSelect = document.getElementById("rentalVenue");
+
     async function loadServicesByCompanion(selectedCompanionId) {
         currentServices = [];
         if (!selectedCompanionId) {
             serviceSelect.innerHTML = `<option value="">Chọn companion để tải dịch vụ</option>`;
             if (servicePriceHint) servicePriceHint.textContent = "";
             if (holdAmountHint) holdAmountHint.textContent = "";
+            if (rentalVenueSelect) {
+                rentalVenueSelect.innerHTML = `<option value="">Chọn companion trước</option>`;
+                rentalVenueSelect.disabled = true;
+            }
             return;
         }
-        const res = await apiFetch(`/api/companions/${selectedCompanionId}/service-prices`, { headers: {} });
-        currentServices = res.ok ? await res.json() : [];
+        const [spRes, compRes] = await Promise.all([
+            apiFetch(`/api/companions/${selectedCompanionId}/service-prices`, { headers: {} }),
+            apiFetch(`/api/companions/${selectedCompanionId}`, { headers: {} })
+        ]);
+        currentServices = spRes.ok ? await spRes.json() : [];
+        const detail = unwrapOptionalEntity(compRes.ok ? await compRes.json() : null);
+        const venues = parseRentalVenuesLines(detail?.rentalVenues);
+        if (rentalVenueSelect) {
+            if (!venues.length) {
+                rentalVenueSelect.innerHTML = `<option value="">Companion chưa cấu hình nơi thuê</option>`;
+                rentalVenueSelect.disabled = true;
+                setMessage("booking-message", "warning", "Companion này chưa cấu hình danh sách nơi thuê trong hồ sơ — không thể đặt lịch cho đến khi họ cập nhật.");
+            } else {
+                rentalVenueSelect.disabled = false;
+                rentalVenueSelect.innerHTML = `<option value="">Chọn nơi thuê</option>${venues
+                    .map((v) => {
+                        const esc = escapeHtml(v);
+                        return `<option value="${esc}">${esc}</option>`;
+                    })
+                    .join("")}`;
+                setMessage("booking-message", "", "");
+            }
+        }
         if (!currentServices.length) {
             serviceSelect.innerHTML = `<option value="">Companion chưa cấu hình dịch vụ</option>`;
             if (servicePriceHint) servicePriceHint.textContent = "Companion này chưa có dịch vụ cố định để đặt.";
@@ -430,14 +550,20 @@ async function initBookingPage(auth) {
             const district = (locationDistrict?.value || "").trim();
             return [street, district, province].filter(Boolean).join(", ");
         })();
+        const rentalVenue = (document.getElementById("rentalVenue")?.value || "").trim();
         const payload = {
             companionId: Number(document.getElementById("companionId").value),
             servicePriceId: Number(document.getElementById("servicePriceId").value),
             bookingTime: document.getElementById("bookingTime").value,
             duration: Number(document.getElementById("duration").value),
+            rentalVenue,
             location,
             note: document.getElementById("note").value
         };
+        if (!rentalVenue) {
+            setMessage("booking-message", "warning", "Vui lòng chọn nơi thuê từ danh sách companion cung cấp.");
+            return;
+        }
         if (!payload.servicePriceId) {
             setMessage("booking-message", "warning", "Vui lòng chọn dịch vụ của companion trước khi đặt lịch.");
             return;
@@ -464,7 +590,8 @@ async function initAppointmentsPage(auth) {
           <div class="col-md-6"><strong>Thời gian:</strong> ${escapeHtml(formatDateTime(b.bookingTime))}</div>
           <div class="col-md-6"><strong>Thời lượng:</strong> ${escapeHtml(b.duration)} phút</div>
           <div class="col-md-6"><strong>Tiền cọc:</strong> ${escapeHtml(Number(b.holdAmount || 0).toLocaleString("vi-VN"))} VND</div>
-          <div class="col-md-6"><strong>Địa điểm:</strong> ${escapeHtml(b.location || "-")}</div>
+          <div class="col-md-6"><strong>Nơi thuê:</strong> ${escapeHtml(b.rentalVenue || "-")}</div>
+          <div class="col-md-6"><strong>Địa điểm gặp thêm:</strong> ${escapeHtml(b.location || "-")}</div>
           <div class="col-md-6"><strong>Trạng thái:</strong> ${escapeHtml(b.status || "-")}</div>
           <div class="col-md-6"><strong>Dịch vụ:</strong> ${escapeHtml(b.serviceName || "-")}</div>
           <div class="col-md-6"><strong>Giá dịch vụ:</strong> ${Number(b.servicePricePerHour || 0).toLocaleString("vi-VN")} VND/giờ</div>
@@ -606,15 +733,22 @@ async function initReportPage(auth) {
         const bookings = res.ok ? await res.json() : [];
         const booking = bookings.find((b) => Number(b.id) === Number(bookingId));
         if (!booking) {
-            return `SOS khẩn cấp tại booking #${bookingId}. Cần hỗ trợ ngay.`;
+            return `Booking #${bookingId} · Yêu cầu hỗ trợ khẩn.`;
         }
         const partner = booking.companion?.user?.fullName || booking.companion?.user?.username || `Companion #${booking.companion?.id || "-"}`;
-        return `SOS khẩn cấp tại booking #${booking.id}. Companion: ${partner}. Thời gian: ${formatDateTime(booking.bookingTime)}. Địa điểm: ${booking.location || "-"}. Cần hỗ trợ ngay.`;
+        return `Booking #${booking.id} · ${partner}\nGiờ hẹn: ${formatDateTime(booking.bookingTime)}\nĐịa điểm hẹn: ${booking.location || "—"}\n→ Cần hỗ trợ khẩn.`;
     }
+
+    document.getElementById("isEmergency")?.addEventListener("change", (ev) => {
+        if (ev.target.checked) {
+            primeReporterGeolocationFromGesture();
+        }
+    });
 
     document.getElementById("quick-sos-toggle")?.addEventListener("click", async () => {
         const emergencyCheckbox = document.getElementById("isEmergency");
         if (emergencyCheckbox) emergencyCheckbox.checked = true;
+        primeReporterGeolocationFromGesture();
         const reason = document.getElementById("reason");
         if (reason && !reason.value.trim()) {
             const bookingIdFromQuery = new URLSearchParams(window.location.search).get("bookingId");
@@ -636,11 +770,55 @@ async function initReportPage(auth) {
     }
     document.getElementById("report-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const isEmergency = document.getElementById("isEmergency").checked;
+        let reporterLatitude = null;
+        let reporterLongitude = null;
+        /** Bắt đầu geolocation ngay (cùng lượt với nút Gửi) để trình duyệt hỏi quyền. */
+        const gpsPromise = isEmergency ? getReporterGps() : null;
+        if (isEmergency) {
+            const insecure = !window.isSecureContext;
+            if (insecure) {
+                setMessage(
+                    "report-message",
+                    "warning",
+                    "Trang đang không ở “ngữ cảnh bảo mật” (secure context). Trình duyệt không cho GPS trên HTTP với IP LAN (vd: http://192.168…) — chỉ cho phép HTTPS hoặc http://localhost / http://127.0.0.1. Hãy mở site bằng một trong các cách đó để gửi tọa độ cho admin."
+                );
+            } else {
+                setMessage(
+                    "report-message",
+                    "info",
+                    "Đang lấy vị trí từ thiết bị… Chọn “Cho phép” khi trình duyệt hỏi (ngoài trời có thể ~30 giây)."
+                );
+            }
+            const pos = await gpsPromise;
+            reporterLatitude = pos.lat;
+            reporterLongitude = pos.lng;
+            if (await reporterIsLikelyDenied()) {
+                setMessage(
+                    "report-message",
+                    "warning",
+                    "Có vẻ bạn đã chặn định vị. Mở biểu tượng khóa bên cạnh địa chỉ → Cho phép “Vị trí” → thử gửi SOS lại."
+                );
+            } else if (reporterLatitude == null || reporterLongitude == null) {
+                let msg =
+                    "Chưa lấy được tọa độ — báo cáo vẫn được gửi. Bật dịch vụ vị trí trên máy, Wi‑Fi/mạng, rồi thử lại.";
+                if (insecure) {
+                    msg += " Thử HTTPS, hoặc http://localhost / 127.0.0.1 (HTTP tới IP LAN thường bị chặn GPS).";
+                }
+                setMessage("report-message", "warning", msg);
+            } else {
+                setMessage("report-message", "", "");
+            }
+        }
+        const bookingIdParam = params.get("bookingId");
         const payload = {
             reportedUserId: Number(reportedUserInput.value),
             reason: document.getElementById("reason").value,
             category: document.getElementById("reportCategory").value,
-            emergency: document.getElementById("isEmergency").checked
+            emergency: isEmergency,
+            bookingId: bookingIdParam ? Number(bookingIdParam) : null,
+            reporterLatitude,
+            reporterLongitude
         };
         const res = await apiFetch("/api/reports", { method: "POST", body: JSON.stringify(payload) });
         if (res.ok) {
@@ -662,7 +840,8 @@ async function initReportPage(auth) {
               <div><strong>Tố cáo user #${r.reportedUser?.id || "-"}</strong> - ${escapeHtml(r.status || "PENDING")}</div>
               <div><strong>Loại:</strong> ${escapeHtml(r.category || "OTHER")} ${r.emergency ? '<span class="badge bg-danger">SOS</span>' : ''}</div>
               <div class="text-muted small">${escapeHtml(formatDateTime(r.createdAt))}</div>
-              <div>${escapeHtml(r.reason || "")}</div>
+              ${r.reporterLatitude != null && r.reporterLongitude != null ? `<div class="small mb-1"><a href="https://www.google.com/maps?q=${encodeURIComponent(String(r.reporterLatitude) + "," + String(r.reporterLongitude))}" target="_blank" rel="noopener">Vị trí GPS lúc gửi</a></div>` : ""}
+              <div class="report-reason-text">${escapeHtml(r.reason || "").replace(/\n/g, "<br>")}</div>
             </div></div>`).join("") : `<div class="empty-state">Bạn chưa gửi tố cáo nào.</div>`;
     }
 
@@ -677,6 +856,138 @@ async function initChatPage(auth) {
     const threadListBox = document.getElementById("chat-thread-list");
     let currentBookingId = Number(params.get("bookingId") || 0);
     let threads = [];
+    let chatStompSub = null;
+    let chatPollTimer = null;
+    let liveStompSub = null;
+    let liveGeolocationTimer = null;
+    let userChatLeafletMap = null;
+    let userChatLeafletMarker = null;
+
+    function currentThreadStatus() {
+        const t = threads.find((x) => x.bookingId === currentBookingId);
+        return t ? t.status : null;
+    }
+
+    function tearDownUserChatLiveMap() {
+        if (userChatLeafletMap) {
+            try {
+                userChatLeafletMap.remove();
+            } catch (_) {}
+            userChatLeafletMap = null;
+            userChatLeafletMarker = null;
+        }
+        const wrap = document.getElementById("live-map-wrap");
+        if (wrap) wrap.style.display = "none";
+    }
+
+    async function paintUserChatLiveMap(lat, lng) {
+        const wrap = document.getElementById("live-map-wrap");
+        const canvas = document.getElementById("live-map-canvas");
+        if (!wrap || !canvas || Number.isNaN(lat) || Number.isNaN(lng)) return;
+        await ensureLeafletLoaded();
+        const L = window.L;
+        if (!L) return;
+        wrap.style.display = "block";
+        await new Promise((r) => requestAnimationFrame(r));
+        if (!userChatLeafletMap) {
+            userChatLeafletMap = L.map(canvas).setView([lat, lng], 15);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(userChatLeafletMap);
+            userChatLeafletMarker = L.marker([lat, lng]).addTo(userChatLeafletMap);
+        } else {
+            userChatLeafletMarker.setLatLng([lat, lng]);
+            userChatLeafletMap.setView([lat, lng], 15);
+            userChatLeafletMap.invalidateSize();
+        }
+    }
+
+    function renderLiveLocationPanel(data) {
+        const details = document.getElementById("live-location-details");
+        if (!details) return;
+        const st = currentThreadStatus();
+        if (!currentBookingId || !st || !["ACCEPTED", "IN_PROGRESS"].includes(st)) {
+            tearDownUserChatLiveMap();
+            details.innerHTML =
+                'Chỉ dùng khi đơn <strong>đã nhận</strong> hoặc <strong>đang diễn ra</strong>. Trình duyệt cần HTTPS/localhost để gửi GPS.';
+            return;
+        }
+        if (!data || data.latitude == null || data.longitude == null) {
+            tearDownUserChatLiveMap();
+            details.innerHTML = "Chưa có điểm nào. Đối phương cần mở chat và cho phép định vị.";
+            return;
+        }
+        const roleLabel = data.role === "COMPANION" ? "Companion" : data.role === "CUSTOMER" ? "Khách" : escapeHtml(data.role || "");
+        const maps = `https://www.google.com/maps?q=${encodeURIComponent(String(data.latitude) + "," + String(data.longitude))}`;
+        const lat = Number(data.latitude);
+        const lng = Number(data.longitude);
+        details.innerHTML = `<div class="mb-1"><span class="text-secondary fw-semibold">${roleLabel}</span> <span class="text-muted">@${escapeHtml(data.username || "")}</span></div>
+            <div class="font-monospace small mb-1">${escapeHtml(String(lat))}, ${escapeHtml(String(lng))}</div>
+            <div class="text-muted small mb-2">${escapeHtml(formatDateTime(data.at))}</div>
+            <a class="btn btn-sm btn-outline-primary" href="${maps}" target="_blank" rel="noopener">Mở Google Maps</a>`;
+        paintUserChatLiveMap(lat, lng).catch(() => {});
+    }
+
+    async function fetchLiveLocationSnapshot() {
+        const st = currentThreadStatus();
+        if (!currentBookingId || !st || !["ACCEPTED", "IN_PROGRESS"].includes(st)) return;
+        const res = await apiFetch(`/api/bookings/me/${currentBookingId}/live-location`, { headers: {} });
+        if (res.ok) renderLiveLocationPanel(await res.json());
+    }
+
+    async function resubscribeChatSocket() {
+        if (chatStompSub && typeof chatStompSub.unsubscribe === "function") {
+            try {
+                chatStompSub.unsubscribe();
+            } catch (_) {}
+            chatStompSub = null;
+        }
+        if (!currentBookingId || !window.RealtimeStomp) return;
+        try {
+            await RealtimeStomp.connect();
+            chatStompSub = await RealtimeStomp.subscribeChat(currentBookingId, () => loadMessages());
+        } catch (e) {
+            console.warn("WebSocket chat không khả dụng", e);
+        }
+    }
+
+    async function resubscribeLiveLocationSocket() {
+        if (liveStompSub && typeof liveStompSub.unsubscribe === "function") {
+            try {
+                liveStompSub.unsubscribe();
+            } catch (_) {}
+            liveStompSub = null;
+        }
+        if (liveGeolocationTimer) {
+            clearInterval(liveGeolocationTimer);
+            liveGeolocationTimer = null;
+        }
+        const st = currentThreadStatus();
+        if (!currentBookingId || !window.RealtimeStomp || !st || !["ACCEPTED", "IN_PROGRESS"].includes(st)) {
+            renderLiveLocationPanel(null);
+            return;
+        }
+        await fetchLiveLocationSnapshot();
+        try {
+            await RealtimeStomp.connect();
+            liveStompSub = await RealtimeStomp.subscribeBookingLocation(currentBookingId, (payload) => renderLiveLocationPanel(payload));
+        } catch (e) {
+            console.warn("WebSocket vị trí không khả dụng", e);
+        }
+        const pushLocation = async () => {
+            const pos = await getReporterGps();
+            if (pos.lat == null || pos.lng == null) return;
+            try {
+                await apiFetch(`/api/bookings/me/${currentBookingId}/live-location`, {
+                    method: "POST",
+                    body: JSON.stringify({ lat: pos.lat, lng: pos.lng })
+                });
+            } catch (_) {}
+        };
+        pushLocation();
+        liveGeolocationTimer = setInterval(pushLocation, 25000);
+    }
 
     function normalizeThreads(list) {
         return (Array.isArray(list) ? list : []).map((b) => {
@@ -711,6 +1022,7 @@ async function initChatPage(auth) {
                 renderThreadList();
                 await loadMessages();
                 await resubscribeChatSocket();
+                await resubscribeLiveLocationSocket();
             });
         });
     }
@@ -799,7 +1111,8 @@ async function initChatPage(auth) {
         const box = document.getElementById("call-info");
         if (res.ok) {
             const info = await res.json();
-            box.innerHTML = `<div class="alert alert-success mb-0">VoIP room: <strong>${escapeHtml(info.roomId)}</strong> | token: ${escapeHtml(info.token)}</div>`;
+            const companionPhone = info.companionPhone || info.contactPhone || "-";
+            box.innerHTML = `<div class="alert alert-success mb-0">VoIP room: <strong>${escapeHtml(info.roomId)}</strong> | token: ${escapeHtml(info.token)}<br><strong>SĐT Companion:</strong> ${escapeHtml(companionPhone)}</div>`;
         } else {
             box.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(await res.text())}</div>`;
         }
@@ -817,6 +1130,7 @@ async function initChatPage(auth) {
         try {
             await RealtimeStomp.ensureLibs();
             await resubscribeChatSocket();
+            await resubscribeLiveLocationSocket();
             if (!chatStompSub) {
                 chatPollTimer = setInterval(loadMessages, 3000);
             }
@@ -826,6 +1140,7 @@ async function initChatPage(auth) {
         }
     } else {
         chatPollTimer = setInterval(loadMessages, 3000);
+        await fetchLiveLocationSnapshot();
     }
 }
 
@@ -865,7 +1180,7 @@ function showUserNotificationToast(notification) {
     item.className = "shadow rounded-3 border bg-white p-3";
     item.innerHTML = `
         <div class="fw-semibold mb-1"><i class="bi bi-bell-fill text-primary me-2"></i>${escapeHtml(notification.title || "Thông báo mới")}</div>
-        <div class="small text-muted">${escapeHtml(notification.content || "")}</div>
+        <div class="small text-muted" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(notification.content || "")}</div>
     `;
     box.appendChild(item);
     setTimeout(() => item.remove(), 4500);
@@ -937,7 +1252,7 @@ async function initNotificationsPage(auth) {
                         <div class="notif-title">${escapeHtml(n.title)}</div>
                         ${!n.isRead ? '<span class="notif-dot ms-2 mt-2"></span>' : ''}
                     </div>
-                    <div class="text-muted small mt-1">${escapeHtml(n.content)}</div>
+                    <div class="text-muted small mt-1" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(n.content)}</div>
                     <div class="notif-time mt-1"><i class="bi bi-clock me-1"></i>${timeStr}</div>
                 </div>
             </div>`;

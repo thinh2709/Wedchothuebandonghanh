@@ -27,6 +27,9 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @Column(length = 20)
+    private String phoneNumber;
+
     private String fullName;
 
     @Enumerated(EnumType.STRING)

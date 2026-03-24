@@ -1,5 +1,5 @@
 /**
- * STOMP over SockJS — kết nối /ws, đăng ký /topic/notifications.user.{userId} và /topic/chat.booking.{bookingId}
+ * STOMP over SockJS — /ws: notifications.user.{id}, chat.booking.{id}, location.booking.{id}
  */
 (function (global) {
     function loadScript(src) {
@@ -79,6 +79,21 @@
             return this.connect().then(() => {
                 return this.client.subscribe(`/topic/chat.booking.${bookingId}`, () => {
                     onMessage();
+                });
+            });
+        },
+
+        /**
+         * Vị trí realtime theo booking — payload JSON { bookingId, latitude, longitude, at, role, username }.
+         */
+        subscribeBookingLocation(bookingId, onMessage) {
+            return this.connect().then(() => {
+                return this.client.subscribe(`/topic/location.booking.${bookingId}`, (message) => {
+                    try {
+                        onMessage(JSON.parse(message.body));
+                    } catch (e) {
+                        console.warn("location parse", e);
+                    }
                 });
             });
         }

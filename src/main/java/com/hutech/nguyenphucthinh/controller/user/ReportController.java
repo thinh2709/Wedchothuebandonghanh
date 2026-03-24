@@ -2,6 +2,7 @@ package com.hutech.nguyenphucthinh.controller.user;
 
 import com.hutech.nguyenphucthinh.model.Report;
 import com.hutech.nguyenphucthinh.service.user.ReportService;
+import com.hutech.nguyenphucthinh.util.RequestBodyParseUtil;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -32,13 +33,35 @@ public class ReportController {
         }
 
         Number reportedUserId = (Number) request.get("reportedUserId");
-        String reason = (String) request.get("reason");
-        String category = (String) request.getOrDefault("category", "OTHER");
-        Boolean emergency = (Boolean) request.getOrDefault("emergency", false);
+        String reason = request.get("reason") == null ? null : String.valueOf(request.get("reason"));
+        String category = request.get("category") == null ? "OTHER" : String.valueOf(request.get("category"));
+        boolean emergency = false;
+        Object em = request.get("emergency");
+        if (em instanceof Boolean b) {
+            emergency = b;
+        } else if (em instanceof String s) {
+            emergency = Boolean.parseBoolean(s);
+        }
         if (reportedUserId == null) {
             throw new RuntimeException("reportedUserId is required");
         }
 
-        return reportService.createReport(userId, reportedUserId.longValue(), reason, category, emergency);
+        Long relatedBookingId = null;
+        Object bid = request.get("bookingId");
+        if (bid instanceof Number n) {
+            relatedBookingId = n.longValue();
+        } else if (bid instanceof String s && !s.isBlank()) {
+            try {
+                relatedBookingId = Long.valueOf(s.trim());
+            } catch (NumberFormatException ignored) {
+                relatedBookingId = null;
+            }
+        }
+
+        Double reporterLat = RequestBodyParseUtil.readDouble(request, "reporterLatitude");
+        Double reporterLng = RequestBodyParseUtil.readDouble(request, "reporterLongitude");
+
+        return reportService.createReport(userId, reportedUserId.longValue(), reason, category, emergency,
+                relatedBookingId, reporterLat, reporterLng);
     }
 }

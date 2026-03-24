@@ -22,6 +22,7 @@
             background: linear-gradient(135deg, #f5f3ff, #ede9fe) !important;
             border-left: 3px solid #8b5cf6;
         }
+        #live-map-canvas { min-height: 220px; z-index: 1; }
     </style>
 </head>
 <body class="bg-light" data-page="companion-chat">
@@ -76,6 +77,13 @@
                         </button>
                     </div>
                     <div id="call-info" class="mb-3"></div>
+                    <div id="live-location-panel" class="border rounded-3 p-3 mb-3 bg-white small">
+                        <div class="fw-semibold mb-2 text-primary"><i class="bi bi-broadcast-pin me-1"></i>Vị trí realtime</div>
+                        <div id="live-location-details" class="text-muted">Chọn đơn ACCEPTED / IN_PROGRESS để theo dõi vị trí đối phương (cập nhật ~25s).</div>
+                        <div id="live-map-wrap" class="mt-2" style="display:none">
+                            <div id="live-map-canvas" class="rounded border bg-light" style="height:240px;width:100%"></div>
+                        </div>
+                    </div>
                     <div id="chat-list" class="border rounded-3 p-3 mb-3" style="height: 340px; overflow: auto;"></div>
                     <form id="chat-form" class="input-group">
                         <input id="chat-content" class="form-control" placeholder="Nhập tin nhắn...">

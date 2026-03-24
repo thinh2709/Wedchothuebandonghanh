@@ -81,6 +81,45 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
+/** Nội dung SOS từ server (nhiều dòng) → HTML dễ quét: nhãn đậm, mục tách, link Maps an toàn. */
+function formatSosNotificationContentHtml(raw) {
+    if (!raw) return "";
+    const lines = String(raw).replace(/\r\n/g, "\n").split("\n");
+    const out = [];
+    const maxKeyLen = 36;
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith("— ") && trimmed.endsWith("—") && trimmed.length > 4) {
+            out.push(
+                `<div class="sos-section-h small fw-bold text-uppercase text-danger mt-3 mb-2 pb-1 border-bottom border-danger border-opacity-25">${escapeHtml(trimmed)}</div>`
+            );
+            continue;
+        }
+        const mapLine = trimmed.match(/^(Google Maps:)\s*(https:\/\/.+)$/i);
+        if (mapLine && /^https:\/\/(www\.)?google\.com\/maps\?q=/i.test(mapLine[2].trim())) {
+            const href = mapLine[2].trim();
+            out.push(
+                `<div class="mb-2"><span class="text-secondary fw-semibold">${escapeHtml(mapLine[1])}</span> <a href="${escapeHtml(href)}" target="_blank" rel="noopener" class="fw-semibold">Mở trên Google Maps</a></div>`
+            );
+            continue;
+        }
+        const kv = line.match(/^([^:]+):\s*(.*)$/);
+        if (kv && kv[1].length <= maxKeyLen && !/^https?:/i.test(kv[1].trim())) {
+            out.push(
+                `<div class="d-flex flex-wrap gap-2 mb-1 align-items-baseline sos-kv-row"><span class="text-secondary fw-semibold flex-shrink-0" style="min-width:8.5rem">${escapeHtml(kv[1])}:</span><span class="text-break flex-grow-1">${escapeHtml(kv[2] || "—")}</span></div>`
+            );
+            continue;
+        }
+        if (/^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(trimmed)) {
+            out.push(`<div class="font-monospace small text-body mb-2 user-select-all">${escapeHtml(trimmed)}</div>`);
+            continue;
+        }
+        out.push(`<div class="mb-1 text-break">${escapeHtml(line)}</div>`);
+    }
+    return out.join("");
+}
+
 function getPageSearchKeyword() {
     return document.querySelector('[data-cy="search-input"]')?.value?.trim() || "";
 }
@@ -694,9 +733,13 @@ function showAdminToast(notification) {
     const box = getAdminToastContainer();
     const item = document.createElement("div");
     item.className = "shadow rounded-3 border bg-white p-3";
+    const isSos = isSosNotification(notification);
+    const bodyInner = isSos
+        ? formatSosNotificationContentHtml(notification.content || "")
+        : `<div class="small text-muted" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(notification.content || "")}</div>`;
     item.innerHTML = `
         <div class="fw-semibold mb-1"><i class="bi bi-bell-fill text-primary me-2"></i>${escapeHtml(notification.title || "Thông báo mới")}</div>
-        <div class="small text-muted">${escapeHtml(notification.content || "")}</div>
+        ${isSos ? `<div class="small text-body">${bodyInner}</div>` : bodyInner}
     `;
     box.appendChild(item);
     setTimeout(() => item.remove(), 5000);
@@ -708,13 +751,18 @@ function showAdminSosAlarm(notification) {
     const overlay = document.createElement("div");
     overlay.id = "admin-sos-overlay";
     overlay.style.cssText = "position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;";
+    const bodyHtml = formatSosNotificationContentHtml(notification.content || "");
     overlay.innerHTML = `
-        <div class="bg-white rounded-4 shadow p-4 text-center" style="max-width:560px;width:100%;border:4px solid #ef4444;animation:sos-pulse .9s infinite alternate;">
-            <div class="display-6 text-danger mb-2"><i class="bi bi-exclamation-octagon-fill"></i></div>
-            <h3 class="h4 fw-bold text-danger mb-2">CẢNH BÁO SOS KHẨN CẤP</h3>
-            <div class="fw-semibold mb-2">${escapeHtml(notification.title || "SOS")}</div>
-            <p class="text-muted mb-3">${escapeHtml(notification.content || "")}</p>
-            <button id="admin-sos-close-btn" class="btn btn-danger px-4">Đã nhận cảnh báo</button>
+        <div class="bg-white rounded-4 shadow p-4" style="max-width:560px;width:100%;border:4px solid #ef4444;animation:sos-pulse .9s infinite alternate;">
+            <div class="text-center">
+                <div class="display-6 text-danger mb-2"><i class="bi bi-exclamation-octagon-fill"></i></div>
+                <h3 class="h4 fw-bold text-danger mb-2">CẢNH BÁO SOS KHẨN CẤP</h3>
+                <div class="fw-semibold mb-3 text-body">${escapeHtml(notification.title || "SOS")}</div>
+            </div>
+            <div class="text-start small text-body mb-3 sos-modal-body" style="max-height:min(52vh,380px);overflow:auto;line-height:1.45;">${bodyHtml}</div>
+            <div class="text-center pt-1">
+                <button id="admin-sos-close-btn" class="btn btn-danger px-4">Đã nhận cảnh báo</button>
+            </div>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -795,7 +843,7 @@ async function loadAdminNotifications() {
                         <div class="notif-title">${escapeHtml(n.title)}</div>
                         ${!n.isRead ? '<span class="notif-dot ms-2 mt-2"></span>' : ""}
                     </div>
-                    <div class="text-muted small mt-1">${escapeHtml(n.content)}</div>
+                    <div class="small mt-1 admin-notif-body ${(n.title || "").toLowerCase().includes("sos") ? "text-body" : "text-muted"}">${(n.title || "").toLowerCase().includes("sos") ? formatSosNotificationContentHtml(n.content || "") : escapeHtml(n.content || "")}</div>
                     <div class="notif-time mt-1"><i class="bi bi-clock me-1"></i>${timeStr}</div>
                 </div>
             </div>`;

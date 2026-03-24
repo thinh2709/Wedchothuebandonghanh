@@ -58,6 +58,7 @@
                         <div class="col-12 form-check ms-2">
                             <input id="isEmergency" class="form-check-input" type="checkbox">
                             <label class="form-check-label fw-semibold text-danger" for="isEmergency"><i class="bi bi-exclamation-octagon-fill me-1"></i>SOS khẩn cấp</label>
+                            <div class="form-text small">SOS lấy <strong>vị trí từ thiết bị</strong> khi gửi (cần cho phép trình duyệt). Theo chính sách trình duyệt: GPS chỉ chạy trên <strong>HTTPS</strong> hoặc <strong>http://localhost</strong> / <strong>http://127.0.0.1</strong>. Thiết bị khác (điện thoại): dùng <strong>HTTPS</strong> tới máy dev — chạy profile <code>https-lan</code> và mở <code>https://IP_máy_tính:8443</code> (xem <code>application-https-lan.properties</code>), hoặc tunnel kiểu ngrok / Cloudflare Tunnel. Chỉ <strong>http://192.168…</strong> thì GPS thường không chạy. Nếu lỗi tạm thời, hệ thống tự thử lại theo mạng/Wi‑Fi.</div>
                         </div>
                         <div class="col-12 d-grid">
                             <button class="btn btn-warning" type="submit"><i class="bi bi-flag-fill me-1"></i>Gửi tố cáo</button>

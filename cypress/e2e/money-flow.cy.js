@@ -17,6 +17,7 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
 
   const state = {
     companionId: null,
+    servicePriceId: null,
     bookingId: null,
     holdAmount: 0,
     withdrawalId: null,
@@ -88,6 +89,39 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
         state.companionId = found.id;
       }
     });
+
+    apiLogin(companionUser);
+    cy.request({
+      method: 'PUT',
+      url: '/api/companions/me/profile',
+      body: {
+        bio: 'Money flow companion',
+        hobbies: 'test',
+        appearance: 'test',
+        availability: 'luon san',
+        serviceType: 'Test',
+        area: 'TPHCM',
+        rentalVenues: 'Quán cafe MoneyFlow\nCông viên MoneyFlow',
+        gender: 'Khác',
+        gameRank: 'N/A',
+        onlineStatus: 'true',
+        avatarUrl: '',
+        introVideoUrl: '',
+      },
+    });
+    cy.request({
+      method: 'POST',
+      url: '/api/companions/me/service-prices',
+      body: {
+        serviceName: 'Dịch vụ MoneyFlow',
+        pricePerHour: '200000',
+        description: 'money flow test',
+      },
+    }).then((resp) => {
+      expect(resp.status).to.eq(200);
+      state.servicePriceId = resp.body.id;
+    });
+    apiLogout();
   });
 
   it('1. Nạp tiền → balance tăng đúng, có DEPOSIT trong lịch sử', () => {
@@ -133,8 +167,10 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
       url: '/api/bookings',
       body: {
         companionId: state.companionId,
+        servicePriceId: state.servicePriceId,
         bookingTime,
         duration: BOOKING_DURATION,
+        rentalVenue: 'Quán cafe MoneyFlow',
         location: 'Money test Quan 1',
         note: 'Money flow test booking',
       },
@@ -376,8 +412,10 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
         url: '/api/bookings',
         body: {
           companionId: state.companionId,
+          servicePriceId: state.servicePriceId,
           bookingTime,
           duration: 60,
+          rentalVenue: 'Quán cafe MoneyFlow',
           location: 'Test cancel',
           note: 'cancel test',
         },
@@ -417,8 +455,10 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
         url: '/api/bookings',
         body: {
           companionId: state.companionId,
+          servicePriceId: state.servicePriceId,
           bookingTime: farFuture,
           duration: 60,
+          rentalVenue: 'Quán cafe MoneyFlow',
           location: 'Refund test',
           note: 'refund policy test',
         },

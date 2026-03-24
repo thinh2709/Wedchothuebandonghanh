@@ -40,6 +40,11 @@ public class StompSubscribeInterceptor implements ChannelInterceptor {
             if (!chatService.canAccessBookingChat(userId, bookingId)) {
                 throw new IllegalStateException("Không có quyền xem cuộc trò chuyện này");
             }
+        } else if (dest != null && dest.startsWith("/topic/location.booking.")) {
+            long bookingId = Long.parseLong(dest.substring("/topic/location.booking.".length()));
+            if (!chatService.canAccessBookingChat(userId, bookingId)) {
+                throw new IllegalStateException("Không có quyền theo dõi vị trí đơn này");
+            }
         } else if (dest != null && dest.startsWith("/topic/notifications.user.")) {
             long targetUserId = Long.parseLong(dest.substring("/topic/notifications.user.".length()));
             if (userId != targetUserId) {

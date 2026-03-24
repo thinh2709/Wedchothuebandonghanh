@@ -1,5 +1,5 @@
-async function getJson(url, options) {
-    const res = await fetch(url, options);
+async function getJson(url, options = {}) {
+    const res = await fetch(url, { credentials: 'same-origin', ...options });
     if (!res.ok) {
         throw new Error(await res.text());
     }

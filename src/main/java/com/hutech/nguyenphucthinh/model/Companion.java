@@ -38,6 +38,10 @@ public class Companion {
     @Column(length = 120)
     private String area;
 
+    /** Mỗi dòng là một nơi thuê khách được chọn khi đặt lịch. */
+    @Column(columnDefinition = "TEXT")
+    private String rentalVenues;
+
     @Column(length = 20)
     private String gender;
 

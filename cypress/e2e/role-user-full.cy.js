@@ -32,14 +32,26 @@ describe('USER full flow: UI to API', () => {
     return cy.request('/api/companions').then((res) => {
       expect(res.status).to.eq(200);
       expect(res.body).to.be.an('array');
-      const online = (res.body || []).find((c) => c.onlineStatus === true);
+      const online = (res.body || []).find((c) => {
+        if (!c.onlineStatus) return false;
+        const lines = String(c.rentalVenues || '')
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return lines.length > 0;
+      });
       if (!online) return null;
       return cy.request(`/api/companions/${online.id}/service-prices`).then((spRes) => {
         const firstService = (spRes.body || [])[0];
         if (!firstService) return null;
+        const firstVenue = String(online.rentalVenues || '')
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean)[0];
         return {
           companion: online,
           servicePriceId: firstService.id,
+          rentalVenue: firstVenue,
         };
       });
     });
@@ -69,7 +81,7 @@ describe('USER full flow: UI to API', () => {
         cy.log('Skip booking/chat/report: chưa có companion online có service');
         return;
       }
-      const { companion, servicePriceId } = ctx;
+      const { companion, servicePriceId, rentalVenue } = ctx;
 
       cy.intercept('POST', `/api/favorites/${companion.id}`).as('addFavoriteApi');
       cy.visit(`/user/profile.html?id=${companion.id}`);
@@ -87,7 +99,8 @@ describe('USER full flow: UI to API', () => {
       cy.get('#booking-service-price-hint').invoke('text').should('not.equal', '');
       cy.get('#bookingTime').type('2030-12-31T20:00');
       cy.get('#duration').clear().type('60');
-      cy.get('#location').clear().type('Quan 1');
+      cy.get('#locationEnabled').uncheck({ force: true });
+      cy.get('#rentalVenue').select(rentalVenue);
       cy.get('#note').clear().type('booking by cypress');
       cy.get('#booking-form').submit();
       cy.wait('@createBookingApi').then(({ response }) => {

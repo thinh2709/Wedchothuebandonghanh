@@ -2,6 +2,7 @@ package com.hutech.nguyenphucthinh.controller.user;
 
 import com.hutech.nguyenphucthinh.model.Booking;
 import com.hutech.nguyenphucthinh.service.user.BookingService;
+import com.hutech.nguyenphucthinh.util.RequestBodyParseUtil;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -26,10 +27,11 @@ public class BookingController {
         Number duration = (Number) request.get("duration");
         String location = (String) request.getOrDefault("location", "");
         String note = (String) request.getOrDefault("note", "");
+        String rentalVenue = (String) request.getOrDefault("rentalVenue", "");
         if (companionId == null || servicePriceId == null || bookingTime == null || duration == null) {
             throw new RuntimeException("companionId, servicePriceId, bookingTime, duration are required");
         }
-        return bookingService.createBooking(userId, companionId.longValue(), servicePriceId.longValue(), bookingTime, duration.intValue(), location, note);
+        return bookingService.createBooking(userId, companionId.longValue(), servicePriceId.longValue(), bookingTime, duration.intValue(), rentalVenue, location, note);
     }
 
     @GetMapping("/me")
@@ -74,5 +76,29 @@ public class BookingController {
     @GetMapping("/customer/{customerId}")
     public List<Booking> getCustomerBookings(@PathVariable Long customerId) {
         return bookingService.getBookingsByCustomer(customerId);
+    }
+
+    /** Cập nhật vị trí realtime (khách hoặc companion của đơn). */
+    @PostMapping("/me/{bookingId}/live-location")
+    public Map<String, Object> postLiveLocation(
+            @PathVariable Long bookingId,
+            @RequestBody Map<String, Object> body,
+            HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        Double lat = RequestBodyParseUtil.readDouble(body, "lat");
+        Double lng = RequestBodyParseUtil.readDouble(body, "lng");
+        return bookingService.updateLiveLocation(userId, bookingId, lat, lng);
+    }
+
+    @GetMapping("/me/{bookingId}/live-location")
+    public Map<String, Object> getLiveLocation(@PathVariable Long bookingId, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return bookingService.getLiveLocation(userId, bookingId);
     }
 }

@@ -33,6 +33,10 @@ public class Booking {
     @Column(length = 255)
     private String location;
 
+    /** Giá trị đã chọn từ danh sách nơi thuê của companion. */
+    @Column(length = 500)
+    private String rentalVenue;
+
     @Column(length = 120)
     private String serviceName;
 
@@ -61,6 +65,17 @@ public class Booking {
     private Double checkOutLatitude;
 
     private Double checkOutLongitude;
+
+    /** Vị trí chia sẻ realtime (đơn ACCEPTED / IN_PROGRESS), cập nhật định kỳ từ app. */
+    private Double liveLatitude;
+
+    private Double liveLongitude;
+
+    private LocalDateTime liveLocationAt;
+
+    /** CUSTOMER hoặc COMPANION — ai gửi bản tin vị trí gần nhất. */
+    @Column(length = 20)
+    private String liveLocationRole;
 
     private Boolean sosTriggered = false;
 
