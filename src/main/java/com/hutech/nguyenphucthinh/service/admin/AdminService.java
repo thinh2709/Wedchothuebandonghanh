@@ -123,6 +123,12 @@ public class AdminService {
         return Map.of("message", "Da khoa tai khoan", "userId", userId, "flag", "BANNED");
     }
 
+    public Map<String, Object> resetUserStatus(Long userId) {
+        userRepository.findById(userId).orElseThrow();
+        userFlags.remove(userId);
+        return Map.of("message", "Da khoi phuc trang thai binh thuong", "userId", userId, "flag", "NONE");
+    }
+
     public List<Map<String, Object>> getReviewsForModeration() {
         List<Review> reviews = entityManager.createQuery(
                         "select r from Review r order by r.createdAt desc",

@@ -75,6 +75,40 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
+function buildUserActionButtons(userId) {
+    const template = document.getElementById("user-actions-template");
+    if (template?.content) {
+        const fragment = template.content.cloneNode(true);
+        fragment.querySelectorAll("button[data-action]").forEach((button) => {
+            button.dataset.id = String(userId);
+        });
+        return fragment;
+    }
+
+    const fallback = document.createDocumentFragment();
+    const warnBtn = document.createElement("button");
+    warnBtn.className = "btn btn-sm btn-warning me-1";
+    warnBtn.dataset.action = "warn";
+    warnBtn.dataset.id = String(userId);
+    warnBtn.textContent = "Cảnh cáo";
+
+    const banBtn = document.createElement("button");
+    banBtn.className = "btn btn-sm btn-danger me-1";
+    banBtn.dataset.action = "ban";
+    banBtn.dataset.id = String(userId);
+    banBtn.textContent = "Khóa";
+
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "btn btn-sm btn-success";
+    resetBtn.dataset.action = "reset-status";
+    resetBtn.dataset.id = String(userId);
+    resetBtn.setAttribute("data-cy", "btn-reset-status");
+    resetBtn.textContent = "Bình thường";
+
+    fallback.append(warnBtn, banBtn, resetBtn);
+    return fallback;
+}
+
 function bindLogout() {
     const logoutBtn = document.getElementById("logout-btn");
     if (!logoutBtn) {
@@ -158,11 +192,12 @@ async function loadUsersPage() {
             <td>${escapeHtml(user.email)}</td>
             <td>${escapeHtml(user.role)}</td>
             <td><span class="badge ${user.flag === "BANNED" ? "text-bg-danger" : user.flag === "WARNED" ? "text-bg-warning" : "text-bg-secondary"}">${escapeHtml(user.flag === "BANNED" ? "Đã khóa" : user.flag === "WARNED" ? "Đã cảnh cáo" : "Bình thường")}</span></td>
-            <td>
-                <button class="btn btn-sm btn-warning me-1" data-action="warn" data-id="${user.id}">Cảnh cáo</button>
-                <button class="btn btn-sm btn-danger" data-action="ban" data-id="${user.id}">Khóa</button>
-            </td>
+            <td class="user-actions-cell"></td>
         `;
+        const actionsCell = tr.querySelector(".user-actions-cell");
+        if (actionsCell) {
+            actionsCell.appendChild(buildUserActionButtons(user.id));
+        }
         usersBody.appendChild(tr);
     });
 
@@ -184,12 +219,31 @@ async function loadUsersPage() {
     usersBody.querySelectorAll('button[data-action="ban"]').forEach((btn) => {
         btn.addEventListener("click", () => updateUserFlag(btn.dataset.id, "ban"));
     });
+    usersBody.querySelectorAll('button[data-action="reset-status"]').forEach((btn) => {
+        btn.addEventListener("click", () => updateUserFlag(btn.dataset.id, "reset-status"));
+    });
 }
 
 async function updateUserFlag(userId, action) {
-    const endpoint = action === "warn" ? "warn" : "ban";
-    await requestJson(`/api/admin/users/${userId}/${endpoint}`, { method: "POST" });
-    showAlert(action === "warn" ? "Đã cảnh cáo tài khoản." : "Đã khóa tài khoản.");
+    let endpoint = "ban";
+    let method = "POST";
+    let successMessage = "Đã khóa tài khoản.";
+
+    if (action === "warn") {
+        endpoint = "warn";
+        successMessage = "Đã cảnh cáo tài khoản.";
+    } else if (action === "reset-status") {
+        const confirmed = window.confirm("Bạn có chắc chắn muốn khôi phục trạng thái bình thường cho người dùng này không?");
+        if (!confirmed) {
+            return;
+        }
+        endpoint = "reset-status";
+        method = "PUT";
+        successMessage = "Đã khôi phục trạng thái bình thường cho tài khoản.";
+    }
+
+    await requestJson(`/api/admin/users/${userId}/${endpoint}`, { method });
+    showAlert(successMessage);
     await loadUsersPage();
 }
 

@@ -62,6 +62,12 @@ public class AdminController {
         return adminService.banUser(id);
     }
 
+    @PutMapping("/users/{id}/reset-status")
+    public Map<String, Object> resetUserStatus(@PathVariable Long id, HttpServletRequest request) {
+        assertAdmin(request);
+        return adminService.resetUserStatus(id);
+    }
+
     @GetMapping("/moderation/reviews")
     public List<Map<String, Object>> getReviewsForModeration(HttpServletRequest request) {
         assertAdmin(request);
