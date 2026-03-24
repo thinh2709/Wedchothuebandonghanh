@@ -6,9 +6,11 @@ import com.hutech.nguyenphucthinh.model.Report;
 import com.hutech.nguyenphucthinh.model.Review;
 import com.hutech.nguyenphucthinh.model.Transaction;
 import com.hutech.nguyenphucthinh.model.User;
+import com.hutech.nguyenphucthinh.model.Withdrawal;
 import com.hutech.nguyenphucthinh.repository.CompanionRepository;
 import com.hutech.nguyenphucthinh.repository.TransactionRepository;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
+import com.hutech.nguyenphucthinh.repository.WithdrawalRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +19,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,8 @@ public class AdminService {
     private UserRepository userRepository;
     @Autowired
     private TransactionRepository transactionRepository;
+    @Autowired
+    private WithdrawalRepository withdrawalRepository;
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -154,26 +157,24 @@ public class AdminService {
 
     public Map<String, Object> getTransactionManagementData() {
         List<Map<String, Object>> withdrawals = new ArrayList<>();
-        for (Transaction transaction : transactionRepository.findAll()) {
-            if (transaction.getStatus() == Transaction.Status.PENDING) {
-                Map<String, Object> item = new HashMap<>();
-                item.put("id", transaction.getId());
-                item.put("amount", transaction.getAmount());
-                item.put("createdAt", transaction.getCreatedAt());
-                item.put("status", transaction.getStatus());
-                item.put("bookingId", transaction.getBooking() == null ? null : transaction.getBooking().getId());
-                item.put(
-                        "companionName",
-                        transaction.getBooking() != null
-                                && transaction.getBooking().getCompanion() != null
-                                && transaction.getBooking().getCompanion().getUser() != null
-                                ? transaction.getBooking().getCompanion().getUser().getUsername()
-                                : "Unknown"
-                );
-                withdrawals.add(item);
-            }
+        for (Withdrawal withdrawal : withdrawalRepository.findByStatusOrderByCreatedAtDesc(Withdrawal.Status.PENDING)) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", withdrawal.getId());
+            item.put("amount", withdrawal.getAmount());
+            item.put("createdAt", withdrawal.getCreatedAt());
+            item.put("status", withdrawal.getStatus());
+            item.put("bankName", withdrawal.getBankName());
+            item.put("bankAccountNumber", withdrawal.getBankAccountNumber());
+            item.put("accountHolderName", withdrawal.getAccountHolderName());
+            item.put(
+                    "companionName",
+                    withdrawal.getCompanion() != null
+                            && withdrawal.getCompanion().getUser() != null
+                            ? withdrawal.getCompanion().getUser().getUsername()
+                            : "Unknown"
+            );
+            withdrawals.add(item);
         }
-        withdrawals.sort(Comparator.comparing(item -> String.valueOf(item.get("createdAt")), Comparator.reverseOrder()));
         return Map.of("commissionRate", commissionRate, "pendingWithdrawals", withdrawals);
     }
 
@@ -185,18 +186,24 @@ public class AdminService {
         return Map.of("message", "Da cap nhat commission rate", "commissionRate", commissionRate);
     }
 
-    public Map<String, Object> approveWithdrawal(Long transactionId) {
-        Transaction transaction = transactionRepository.findById(transactionId).orElseThrow();
-        transaction.setStatus(Transaction.Status.COMPLETED);
-        transactionRepository.save(transaction);
-        return Map.of("message", "Da duyet lenh rut tien", "transactionId", transactionId, "status", transaction.getStatus());
+    public Map<String, Object> approveWithdrawal(Long withdrawalId) {
+        Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId).orElseThrow();
+        if (withdrawal.getStatus() != Withdrawal.Status.PENDING) {
+            throw new RuntimeException("Chi duyet duoc lenh rut tien dang cho");
+        }
+        withdrawal.setStatus(Withdrawal.Status.APPROVED);
+        withdrawalRepository.save(withdrawal);
+        return Map.of("message", "Da duyet lenh rut tien", "withdrawalId", withdrawalId, "status", withdrawal.getStatus());
     }
 
-    public Map<String, Object> rejectWithdrawal(Long transactionId) {
-        Transaction transaction = transactionRepository.findById(transactionId).orElseThrow();
-        transaction.setStatus(Transaction.Status.FAILED);
-        transactionRepository.save(transaction);
-        return Map.of("message", "Da tu choi lenh rut tien", "transactionId", transactionId, "status", transaction.getStatus());
+    public Map<String, Object> rejectWithdrawal(Long withdrawalId) {
+        Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId).orElseThrow();
+        if (withdrawal.getStatus() != Withdrawal.Status.PENDING) {
+            throw new RuntimeException("Chi tu choi duoc lenh rut tien dang cho");
+        }
+        withdrawal.setStatus(Withdrawal.Status.REJECTED);
+        withdrawalRepository.save(withdrawal);
+        return Map.of("message", "Da tu choi lenh rut tien", "withdrawalId", withdrawalId, "status", withdrawal.getStatus());
     }
 
     public List<Map<String, Object>> getDisputes() {

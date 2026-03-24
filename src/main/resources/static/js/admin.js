@@ -1,7 +1,13 @@
 async function requestJson(url, options = {}) {
     const response = await fetch(url, options);
     if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        let message = text;
+        try {
+            const json = JSON.parse(text);
+            message = json.message || text;
+        } catch (_) {}
+        throw new Error(message);
     }
     return response.json();
 }
@@ -209,7 +215,8 @@ async function loadTransactionsPage() {
         tr.innerHTML = `
             <td>${item.id}</td>
             <td>${escapeHtml(item.companionName || "")}</td>
-            <td>${item.bookingId || ""}</td>
+            <td>${escapeHtml(item.bankName || "")}</td>
+            <td>${escapeHtml(item.bankAccountNumber || "")}</td>
             <td>${formatMoney(item.amount)}</td>
             <td><span class="badge text-bg-warning">${escapeHtml(item.status)}</span></td>
             <td>

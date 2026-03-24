@@ -19,7 +19,9 @@ import com.hutech.nguyenphucthinh.repository.WithdrawalRepository;
 import com.hutech.nguyenphucthinh.service.user.NotificationService;
 import com.hutech.nguyenphucthinh.service.user.WalletService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -363,7 +365,16 @@ public class CompanionService {
 
     public Withdrawal createWithdrawal(Long userId, BigDecimal amount, String bankName, String bankAccountNumber, String accountHolderName) {
         if (amount == null || amount.signum() <= 0) {
-            throw new RuntimeException("Withdraw amount must be greater than 0");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Withdraw amount must be greater than 0");
+        }
+        if (bankName == null || bankName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank name is required");
+        }
+        if (bankAccountNumber == null || bankAccountNumber.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account number is required");
+        }
+        if (accountHolderName == null || accountHolderName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Account holder name is required");
         }
         Companion companion = getCompanionByUserId(userId);
         BigDecimal available = transactionRepository.sumCompletedIncomeByCompanionId(companion.getId())
@@ -372,14 +383,14 @@ public class CompanionService {
             available = BigDecimal.ZERO;
         }
         if (amount.compareTo(available) > 0) {
-            throw new RuntimeException("Insufficient available balance");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient available balance");
         }
         Withdrawal withdrawal = new Withdrawal();
         withdrawal.setCompanion(companion);
         withdrawal.setAmount(amount);
-        withdrawal.setBankName(bankName);
-        withdrawal.setBankAccountNumber(bankAccountNumber);
-        withdrawal.setAccountHolderName(accountHolderName);
+        withdrawal.setBankName(bankName.trim());
+        withdrawal.setBankAccountNumber(bankAccountNumber.trim());
+        withdrawal.setAccountHolderName(accountHolderName.trim());
         withdrawal.setStatus(Withdrawal.Status.PENDING);
         return withdrawalRepository.save(withdrawal);
     }

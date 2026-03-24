@@ -1,7 +1,13 @@
 async function getJson(url, options) {
     const res = await fetch(url, options);
     if (!res.ok) {
-        throw new Error(await res.text());
+        const text = await res.text();
+        let message = text;
+        try {
+            const json = JSON.parse(text);
+            message = json.message || text;
+        } catch (_) {}
+        throw new Error(message);
     }
     if (res.status === 204) {
         return null;
