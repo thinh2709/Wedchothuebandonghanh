@@ -38,4 +38,8 @@ public class FavoriteService {
     public List<Favorite> getFavoritesByCustomer(Long customerId) {
         return favoriteRepository.findByCustomerId(customerId);
     }
+
+    public void removeFavorite(Long customerId, Long companionId) {
+        favoriteRepository.deleteByCustomerIdAndCompanionId(customerId, companionId);
+    }
 }

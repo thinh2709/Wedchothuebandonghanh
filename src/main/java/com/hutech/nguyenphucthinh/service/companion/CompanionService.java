@@ -10,8 +10,11 @@ import com.hutech.nguyenphucthinh.repository.BookingRepository;
 import com.hutech.nguyenphucthinh.repository.CompanionAvailabilityRepository;
 import com.hutech.nguyenphucthinh.repository.CompanionRepository;
 import com.hutech.nguyenphucthinh.repository.ConsultationRepository;
+import com.hutech.nguyenphucthinh.repository.ReviewRepository;
 import com.hutech.nguyenphucthinh.repository.TransactionRepository;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
+import com.hutech.nguyenphucthinh.service.user.NotificationService;
+import com.hutech.nguyenphucthinh.service.user.WalletService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -36,16 +39,38 @@ public class CompanionService {
     private TransactionRepository transactionRepository;
     @Autowired
     private ConsultationRepository consultationRepository;
+    @Autowired
+    private ReviewRepository reviewRepository;
+    @Autowired
+    private WalletService walletService;
+    @Autowired
+    private NotificationService notificationService;
 
     public List<Companion> getAllCompanions() {
-        return companionRepository.findByStatus(Companion.Status.APPROVED);
+        List<Companion> companions = companionRepository.findByStatus(Companion.Status.APPROVED);
+        companions.forEach(this::attachStats);
+        return companions;
     }
 
     public Optional<Companion> getCompanionById(Long id) {
-        return companionRepository.findById(id);
+        Optional<Companion> companion = companionRepository.findById(id);
+        companion.ifPresent(this::attachStats);
+        return companion;
     }
 
-    public Companion registerCompanion(Long userId, String bio, String hobbies, String appearance, String availability) {
+    private void attachStats(Companion companion) {
+        long total = consultationRepository.countByCompanionId(companion.getId());
+        long answered = consultationRepository.countByCompanionIdAndStatus(companion.getId(), Consultation.Status.ANSWERED);
+        companion.setResponseRate(total == 0 ? 100.0 : (answered * 100.0) / total);
+        
+        Double avg = reviewRepository.getAverageRatingByCompanionId(companion.getId());
+        companion.setAverageRating(avg != null ? avg : 0.0);
+        companion.setReviewCount(reviewRepository.getReviewCountByCompanionId(companion.getId()));
+    }
+
+    public Companion registerCompanion(Long userId, String bio, String hobbies, String appearance, String availability,
+                                       String serviceType, String area, String gender, String gameRank,
+                                       Boolean onlineStatus, String avatarUrl, String introVideoUrl) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         if (user.getRole() != User.Role.COMPANION) {
             user.setRole(User.Role.COMPANION);
@@ -61,6 +86,13 @@ public class CompanionService {
         companion.setHobbies(hobbies);
         companion.setAppearance(appearance);
         companion.setAvailability(availability);
+        companion.setServiceType(serviceType);
+        companion.setArea(area);
+        companion.setGender(gender);
+        companion.setGameRank(gameRank);
+        companion.setOnlineStatus(Boolean.TRUE.equals(onlineStatus));
+        companion.setAvatarUrl(avatarUrl);
+        companion.setIntroVideoUrl(introVideoUrl);
         companion.setStatus(Companion.Status.PENDING);
         return companionRepository.save(companion);
     }
@@ -69,13 +101,37 @@ public class CompanionService {
         return companionRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("Companion profile not found"));
     }
 
-    public Companion updateProfile(Long userId, String bio, String hobbies, String appearance, String availability) {
+    public Companion updateProfile(Long userId, String bio, String hobbies, String appearance, String availability,
+                                   String serviceType, String area, String gender, String gameRank,
+                                   Boolean onlineStatus, String avatarUrl, String introVideoUrl) {
         Companion companion = getCompanionByUserId(userId);
         companion.setBio(bio);
         companion.setHobbies(hobbies);
         companion.setAppearance(appearance);
         companion.setAvailability(availability);
+        companion.setServiceType(serviceType);
+        companion.setArea(area);
+        companion.setGender(gender);
+        companion.setGameRank(gameRank);
+        companion.setOnlineStatus(Boolean.TRUE.equals(onlineStatus));
+        companion.setAvatarUrl(avatarUrl);
+        companion.setIntroVideoUrl(introVideoUrl);
         return companionRepository.save(companion);
+    }
+
+    public List<Companion> searchCompanions(String serviceType, String area, String gender, String gameRank,
+                                            Boolean online, BigDecimal minPrice, BigDecimal maxPrice) {
+        return getAllCompanions().stream().filter(c -> {
+            boolean ok = true;
+            if (serviceType != null && !serviceType.isBlank()) ok = ok && serviceType.equalsIgnoreCase(c.getServiceType());
+            if (area != null && !area.isBlank()) ok = ok && c.getArea() != null && c.getArea().toLowerCase().contains(area.toLowerCase());
+            if (gender != null && !gender.isBlank()) ok = ok && gender.equalsIgnoreCase(c.getGender());
+            if (gameRank != null && !gameRank.isBlank()) ok = ok && c.getGameRank() != null && c.getGameRank().toLowerCase().contains(gameRank.toLowerCase());
+            if (online != null) ok = ok && online.equals(c.getOnlineStatus());
+            if (minPrice != null) ok = ok && c.getPricePerHour() != null && c.getPricePerHour().compareTo(minPrice) >= 0;
+            if (maxPrice != null) ok = ok && c.getPricePerHour() != null && c.getPricePerHour().compareTo(maxPrice) <= 0;
+            return ok;
+        }).toList();
     }
 
     public List<CompanionAvailability> getAvailabilities(Long userId) {
@@ -122,6 +178,21 @@ public class CompanionService {
         }
         if (booking.getStatus() != Booking.Status.PENDING) {
             throw new RuntimeException("Booking already processed");
+        }
+        if (status == Booking.Status.ACCEPTED) {
+            walletService.holdForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
+            notificationService.create(
+                    booking.getCustomer().getId(),
+                    "Booking duoc chap nhan",
+                    "Companion da chap nhan don #" + booking.getId() + ". Ban co the chat/call ngay."
+            );
+        }
+        if (status == Booking.Status.REJECTED) {
+            notificationService.create(
+                    booking.getCustomer().getId(),
+                    "Booking bi tu choi",
+                    "Companion da tu choi don #" + booking.getId() + ". Ban hay dat lai voi companion khac."
+            );
         }
         booking.setStatus(status);
         return bookingRepository.save(booking);

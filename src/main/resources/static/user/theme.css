@@ -1,0 +1,30 @@
+.page-hero {
+    background: linear-gradient(135deg, #0d6efd, #6ea8fe);
+    color: #fff;
+}
+
+.auth-card {
+    max-width: 460px;
+}
+
+.page-title {
+    letter-spacing: 0.2px;
+}
+
+.list-empty {
+    padding: 1rem;
+    border: 1px dashed #ced4da;
+    border-radius: 0.75rem;
+    background: #fff;
+    color: #6c757d;
+}
+
+.meta-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.meta-value {
+    margin-bottom: 0.6rem;
+}

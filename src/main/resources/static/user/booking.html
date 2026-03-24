@@ -4,49 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dat lich - User</title>
-    <link rel="stylesheet" href="/css/user.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/user.css">
 </head>
-<body>
+<body data-page="booking" class="bg-light">
+<nav class="navbar navbar-expand-lg bg-white border-bottom">
     <div class="container">
-        <div class="card" style="max-width: 600px; margin: 2rem auto;">
-            <h1>Dat lich hen</h1>
-            <form id="booking-form">
-                <input type="hidden" id="companion-id">
-                <div style="margin-top: 1.5rem;">
-                    <label for="booking-date">Ngay va gio hen</label>
-                    <input type="datetime-local" id="booking-date" required>
+        <a class="navbar-brand fw-bold" href="/user/index.html">Companion Rental</a>
+        <div id="top-nav" class="app-nav d-flex align-items-center flex-wrap gap-1"></div>
+    </div>
+</nav>
+<main class="container py-4">
+    <div class="card user-card mx-auto" style="max-width: 760px;">
+        <div class="card-body p-4">
+            <h1 class="h4 mb-3">Gui yeu cau dat lich</h1>
+            <form id="booking-form" class="row g-3">
+                <div class="col-md-6">
+                    <label for="companionId" class="form-label">Companion</label>
+                    <select id="companionId" class="form-select" required></select>
                 </div>
-                <div>
-                    <label for="duration">Thoi luong (phut)</label>
-                    <input type="number" id="duration" min="30" step="30" value="60" required>
+                <div class="col-md-6">
+                    <label for="bookingTime" class="form-label">Thoi gian bat dau</label>
+                    <input id="bookingTime" type="datetime-local" class="form-control" required>
                 </div>
-                <button type="submit">Xac nhan dat lich</button>
+                <div class="col-md-6">
+                    <label for="duration" class="form-label">Thoi luong (phut)</label>
+                    <input id="duration" type="number" min="30" step="30" value="60" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="location" class="form-label">Dia diem</label>
+                    <input id="location" type="text" class="form-control" placeholder="Quan 1, TP.HCM / Ten game room...">
+                </div>
+                <div class="col-12">
+                    <label for="note" class="form-label">Ghi chu</label>
+                    <textarea id="note" rows="3" class="form-control" placeholder="Them thong tin can luu y"></textarea>
+                </div>
+                <div class="col-12 d-grid">
+                    <button class="btn btn-primary" type="submit">Xac nhan dat lich</button>
+                </div>
             </form>
+            <div id="booking-message" class="mt-3"></div>
         </div>
     </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const companionId = urlParams.get('id');
-            document.getElementById('companion-id').value = companionId;
-            document.getElementById('booking-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const bookingData = {
-                    companion: { id: companionId },
-                    customer: { id: 1 },
-                    bookingTime: document.getElementById('booking-date').value,
-                    duration: document.getElementById('duration').value,
-                    status: 'PENDING'
-                };
-                fetch('/api/bookings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(bookingData)
-                }).then(() => {
-                    window.location.href = '/user/appointments.html';
-                });
-            });
-        });
-    </script>
+</main>
+<script src="../js/user.js"></script>
 </body>
 </html>

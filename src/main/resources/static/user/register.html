@@ -4,32 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dang ky User</title>
-    <link rel="stylesheet" href="/css/user.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/user.css">
 </head>
-<body>
-    <h1>Dang ky tai khoan</h1>
-    <p id="register-message" style="max-width: 400px; margin: 0 auto 1rem; text-align: center; font-weight: bold; color: red;"></p>
-    <form action="/register" method="post">
-        <div>
-            <label for="username">Ten nguoi dung:</label>
-            <input type="text" id="username" name="username" required>
+<body data-page="register" class="bg-light">
+<main class="container py-5">
+    <div class="card auth-card mx-auto user-card">
+        <div class="card-body p-4">
+            <h1 class="h4 page-title mb-3">Dang ky tai khoan</h1>
+            <div id="auth-message" class="mb-3"></div>
+            <form id="register-form" class="row g-3">
+                <div class="col-12">
+                    <label for="username" class="form-label">Ten dang nhap</label>
+                    <input type="text" id="username" name="username" class="form-control" required>
+                </div>
+                <div class="col-12">
+                    <label for="password" class="form-label">Mat khau</label>
+                    <input type="password" id="password" name="password" class="form-control" required>
+                </div>
+                <div class="col-12">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" id="email" name="email" class="form-control" required>
+                </div>
+                <div class="col-12 d-grid">
+                    <button type="submit" class="btn btn-primary">Dang ky</button>
+                </div>
+            </form>
+            <p class="mt-3 mb-0 text-muted">Da co tai khoan? <a href="/user/login.html">Dang nhap ngay</a></p>
         </div>
-        <div>
-            <label for="password">Mat khau:</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        <div>
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
-        </div>
-        <button type="submit">Dang ky</button>
-    </form>
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const messageEl = document.getElementById('register-message');
-        if (messageEl && params.get('error')) {
-            messageEl.textContent = params.get('error');
-        }
-    </script>
+    </div>
+</main>
+<script src="../js/user.js"></script>
 </body>
 </html>

@@ -3,6 +3,8 @@ package com.hutech.nguyenphucthinh.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "companions")
 @Getter
@@ -29,6 +31,38 @@ public class Companion {
 
     @Column(columnDefinition = "TEXT")
     private String availability;
+
+    @Column(length = 50)
+    private String serviceType;
+
+    @Column(length = 120)
+    private String area;
+
+    @Column(length = 20)
+    private String gender;
+
+    @Column(length = 50)
+    private String gameRank;
+
+    private Boolean onlineStatus = false;
+
+    @Column(nullable = false)
+    private BigDecimal pricePerHour = BigDecimal.valueOf(200000);
+
+    @Column(length = 500)
+    private String avatarUrl;
+
+    @Column(length = 500)
+    private String introVideoUrl;
+
+    @Transient
+    private Double responseRate;
+
+    @Transient
+    private Double averageRating;
+
+    @Transient
+    private Long reviewCount;
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
