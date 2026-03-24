@@ -23,17 +23,17 @@
     <div class="admin-main">
         <header class="admin-topbar">
             <h1 class="h4 mb-0">Quản lý người dùng</h1>
-            <button class="btn btn-outline-light btn-sm" id="logout-btn">Đăng xuất</button>
+            <button class="btn btn-outline-light btn-sm" id="logout-btn" data-cy="admin-logout-btn">Đăng xuất</button>
         </header>
 
         <main class="admin-content">
-            <div id="admin-alert" class="mb-3"></div>
+            <div id="admin-alert" class="mb-3" data-cy="admin-alert"></div>
             <div class="row g-3">
                 <div class="col-12">
                     <section class="card panel-card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <span>Danh sách người dùng</span>
-                            <button class="btn btn-sm btn-primary" id="reload-users-btn">Tải lại</button>
+                            <button class="btn btn-sm btn-primary" id="reload-users-btn" data-cy="reload-users-btn">Tải lại</button>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -48,7 +48,7 @@
                                         <th>Hành động</th>
                                     </tr>
                                     </thead>
-                                    <tbody id="users-body"></tbody>
+                                    <tbody id="users-body" data-cy="users-body"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -70,7 +70,7 @@
                                         <th>Tiểu sử</th>
                                     </tr>
                                     </thead>
-                                    <tbody id="companions-body"></tbody>
+                                    <tbody id="companions-body" data-cy="companions-body"></tbody>
                                 </table>
                             </div>
                         </div>

@@ -23,29 +23,29 @@
     <div class="admin-main">
         <header class="admin-topbar">
             <h1 class="h4 mb-0">Bảng điều khiển</h1>
-            <button class="btn btn-outline-light btn-sm" id="logout-btn">Đăng xuất</button>
+            <button class="btn btn-outline-light btn-sm" id="logout-btn" data-cy="admin-logout-btn">Đăng xuất</button>
         </header>
 
         <main class="admin-content">
-            <div id="admin-alert" class="mb-3"></div>
+            <div id="admin-alert" class="mb-3" data-cy="admin-alert"></div>
 
             <section class="row g-3 mb-4">
                 <div class="col-md-4">
                     <div class="stat-card">
                         <div class="stat-label">Lợi nhuận nền tảng</div>
-                        <div class="stat-value" id="stat-profit">0</div>
+                        <div class="stat-value" id="stat-profit" data-cy="stat-profit">0</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="stat-card">
                         <div class="stat-label">Tổng giao dịch</div>
-                        <div class="stat-value" id="stat-transactions">0</div>
+                        <div class="stat-value" id="stat-transactions" data-cy="stat-transactions">0</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="stat-card">
                         <div class="stat-label">Đơn hủy</div>
-                        <div class="stat-value" id="stat-cancelled">0</div>
+                        <div class="stat-value" id="stat-cancelled" data-cy="stat-cancelled">0</div>
                     </div>
                 </div>
             </section>
@@ -53,7 +53,7 @@
             <section class="card panel-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>Companion chờ duyệt</span>
-                    <button class="btn btn-sm btn-primary" id="reload-pending-btn">Tải lại</button>
+                    <button class="btn btn-sm btn-primary" id="reload-pending-btn" data-cy="reload-pending-btn">Tải lại</button>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -67,7 +67,7 @@
                                 <th>Thao tác</th>
                             </tr>
                             </thead>
-                            <tbody id="pending-body"></tbody>
+                            <tbody id="pending-body" data-cy="pending-body"></tbody>
                         </table>
                     </div>
                 </div>

@@ -23,22 +23,22 @@
     <div class="admin-main">
         <header class="admin-topbar">
             <h1 class="h4 mb-0">Quản lý giao dịch & dòng tiền</h1>
-            <button class="btn btn-outline-light btn-sm" id="logout-btn">Đăng xuất</button>
+            <button class="btn btn-outline-light btn-sm" id="logout-btn" data-cy="admin-logout-btn">Đăng xuất</button>
         </header>
 
         <main class="admin-content">
-            <div id="admin-alert" class="mb-3"></div>
+            <div id="admin-alert" class="mb-3" data-cy="admin-alert"></div>
 
             <section class="card panel-card mb-3">
                 <div class="card-header">Tỷ lệ hoa hồng</div>
                 <div class="card-body">
-                    <form id="commission-form" class="row g-2 align-items-end">
+                    <form id="commission-form" class="row g-2 align-items-end" data-cy="commission-form">
                         <div class="col-sm-6 col-lg-4">
                             <label for="commission-rate" class="form-label">Tỷ lệ hoa hồng (0 - 1)</label>
-                            <input id="commission-rate" class="form-control" type="number" min="0" max="1" step="0.01" required>
+                            <input id="commission-rate" class="form-control" type="number" min="0" max="1" step="0.01" required data-cy="commission-rate">
                         </div>
                         <div class="col-sm-6 col-lg-2">
-                            <button class="btn btn-primary w-100" type="submit">Lưu</button>
+                            <button class="btn btn-primary w-100" type="submit" data-cy="save-commission-btn">Lưu</button>
                         </div>
                     </form>
                 </div>
@@ -47,7 +47,7 @@
             <section class="card panel-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>Lệnh rút tiền chờ duyệt</span>
-                    <button class="btn btn-sm btn-primary" id="reload-transactions-btn">Tải lại</button>
+                    <button class="btn btn-sm btn-primary" id="reload-transactions-btn" data-cy="reload-transactions-btn">Tải lại</button>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -62,7 +62,7 @@
                                 <th>Hành động</th>
                             </tr>
                             </thead>
-                            <tbody id="withdrawals-body"></tbody>
+                            <tbody id="withdrawals-body" data-cy="withdrawals-body"></tbody>
                         </table>
                     </div>
                 </div>
