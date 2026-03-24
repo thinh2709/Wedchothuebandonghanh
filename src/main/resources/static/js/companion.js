@@ -226,6 +226,8 @@ async function loadProfile() {
         document.getElementById('hobbies').value = profile.hobbies || '';
         document.getElementById('appearance').value = profile.appearance || '';
         document.getElementById('availability-text').value = profile.availability || '';
+        document.getElementById('service-type').value = profile.serviceType || '';
+        document.getElementById('area').value = profile.area || '';
         document.getElementById('identity-number').value = profile.identityNumber || '';
         document.getElementById('identity-image-url').value = profile.identityImageUrl || '';
         document.getElementById('portrait-image-url').value = profile.portraitImageUrl || '';
@@ -252,7 +254,9 @@ async function saveProfile(e) {
         bio: document.getElementById('bio').value.trim(),
         hobbies: document.getElementById('hobbies').value.trim(),
         appearance: document.getElementById('appearance').value.trim(),
-        availability: document.getElementById('availability-text').value.trim()
+        availability: document.getElementById('availability-text').value.trim(),
+        serviceType: document.getElementById('service-type').value.trim(),
+        area: document.getElementById('area').value.trim()
     };
     await sendJson('/api/companions/me/profile', 'PUT', payload);
     await sendJson('/api/companions/me/identity', 'PUT', {

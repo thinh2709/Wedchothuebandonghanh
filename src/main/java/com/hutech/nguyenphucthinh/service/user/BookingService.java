@@ -75,6 +75,9 @@ public class BookingService {
             throw new RuntimeException("Thời lượng tối thiểu là 30 phút");
         }
         LocalDateTime bookingStart = LocalDateTime.parse(bookingTime);
+        if (bookingStart.isBefore(LocalDateTime.now().plusHours(2))) {
+            throw new RuntimeException("Bạn phải đặt lịch trước ít nhất 2 giờ");
+        }
 
         boolean customerHasActiveBooking = bookingRepository.findByCustomerIdOrderByBookingTimeDesc(customerId)
                 .stream()
@@ -129,9 +132,7 @@ public class BookingService {
         if (booking.getStatus() == Booking.Status.IN_PROGRESS) {
             throw new RuntimeException("Booking đang diễn ra, không thể hủy");
         }
-        if (booking.getStatus() == Booking.Status.PENDING) {
-            walletService.refundForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
-        } else if (booking.getStatus() == Booking.Status.ACCEPTED) {
+        if (booking.getStatus() == Booking.Status.PENDING || booking.getStatus() == Booking.Status.ACCEPTED) {
             BigDecimal refundAmount = calculateRefundAmount(booking);
             if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
                 walletService.refundForBooking(booking.getCustomer(), booking, refundAmount);

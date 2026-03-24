@@ -36,6 +36,25 @@ function setMessage(targetId, type, text) {
     node.innerHTML = text ? `<div class="alert alert-${type} mb-0">${escapeHtml(text)}</div>` : "";
 }
 
+/** Đọc thông báo lỗi từ body JSON (Spring: message) hoặc chuỗi thuần. */
+async function parseApiErrorMessage(res, fallback) {
+    const fb = fallback ?? "Đặt lịch thất bại. Vui lòng kiểm tra thông tin.";
+    try {
+        const text = await res.text();
+        if (!text || !String(text).trim()) return fb;
+        try {
+            const j = JSON.parse(text);
+            if (typeof j.message === "string" && j.message.trim()) return j.message;
+            if (typeof j.error === "string" && j.error.trim()) return j.error;
+        } catch {
+            return String(text).trim();
+        }
+    } catch {
+        return fb;
+    }
+    return fb;
+}
+
 async function getAuth() {
     const res = await apiFetch("/api/auth/me", { headers: {} });
     return res.ok ? res.json() : { authenticated: false };
@@ -45,26 +64,25 @@ function renderTopNav(auth) {
     const nav = document.getElementById("top-nav");
     if (!nav) return;
     const links = `
-        <a class="btn btn-link text-decoration-none" href="/user/index.html"><i class="bi bi-house me-1"></i>Trang chủ</a>
-        <a class="btn btn-link text-decoration-none" href="/user/search.html"><i class="bi bi-search me-1"></i>Tìm kiếm</a>
-        <a class="btn btn-link text-decoration-none" href="/user/booking.html"><i class="bi bi-calendar-plus me-1"></i>Đặt lịch</a>
-        <a class="btn btn-link text-decoration-none" href="/user/appointments.html"><i class="bi bi-calendar-event me-1"></i>Lịch hẹn</a>
-        <a class="btn btn-link text-decoration-none" href="/user/chat.html?bookingId="><i class="bi bi-chat-dots me-1"></i>Chat</a>
-        <a class="btn btn-link text-decoration-none" href="/user/wallet.html"><i class="bi bi-wallet2 me-1"></i>Ví tiền</a>
-        <a class="btn btn-link text-decoration-none" href="/user/favorites.html"><i class="bi bi-heart me-1"></i>Yêu thích</a>
-        <a class="btn btn-link text-decoration-none" href="/user/review.html"><i class="bi bi-star me-1"></i>Đánh giá</a>
-        <a class="btn btn-link text-decoration-none" href="/user/report.html"><i class="bi bi-flag me-1"></i>Tố cáo</a>
-        <a class="btn btn-link text-decoration-none position-relative" href="#" id="notification-link"><i class="bi bi-bell me-1"></i>Thông báo <span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/index.html" title="Trang chủ"><i class="bi bi-house"></i><span class="app-nav-text ms-1">Trang chủ</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/search.html" title="Tìm kiếm"><i class="bi bi-search"></i><span class="app-nav-text ms-1">Tìm</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/appointments.html" title="Lịch hẹn"><i class="bi bi-calendar-event"></i><span class="app-nav-text ms-1">Lịch</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/chat.html?bookingId=" title="Chat"><i class="bi bi-chat-dots"></i><span class="app-nav-text ms-1">Chat</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/wallet.html" title="Ví tiền"><i class="bi bi-wallet2"></i><span class="app-nav-text ms-1">Ví</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/favorites.html" title="Yêu thích"><i class="bi bi-heart"></i><span class="app-nav-text ms-1">Yêu thích</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/review.html" title="Đánh giá"><i class="bi bi-star"></i><span class="app-nav-text ms-1">Đánh giá</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item" href="/user/report.html" title="Tố cáo"><i class="bi bi-flag"></i><span class="app-nav-text ms-1">Tố cáo</span></a>
+        <a class="btn btn-sm btn-link text-decoration-none app-nav-item position-relative" href="#" id="notification-link" title="Thông báo"><i class="bi bi-bell"></i><span class="app-nav-text ms-1">Báo</span><span id="notification-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" style="font-size:0.6rem;">0</span></a>
     `;
     const companionDashboardBtn = auth.authenticated && auth.role === "COMPANION"
-        ? `<a class="btn btn-outline-primary btn-sm ms-2" href="/companion/dashboard.html"><i class="bi bi-grid-1x2 me-1"></i>Dashboard Companion</a>`
+        ? `<a class="btn btn-outline-primary btn-sm ms-1 py-1" href="/companion/dashboard.html" title="Dashboard Companion"><i class="bi bi-grid-1x2"></i><span class="app-nav-text ms-1 d-none d-lg-inline">Companion</span></a>`
         : "";
     const authPart = auth.authenticated
-        ? `<span class="navbar-text ms-2"><i class="bi bi-person-circle me-1"></i>Xin chào, <strong>${escapeHtml(auth.username)}</strong></span>
+        ? `<span class="navbar-text ms-1 small text-nowrap"><i class="bi bi-person-circle"></i> <strong>${escapeHtml(auth.username)}</strong></span>
            ${companionDashboardBtn}
-           <button id="logout-btn" class="btn btn-outline-danger btn-sm ms-2"><i class="bi bi-box-arrow-right me-1"></i>Đăng xuất</button>`
-        : `<a class="btn btn-outline-primary btn-sm ms-2" href="/user/login.html"><i class="bi bi-box-arrow-in-right me-1"></i>Đăng nhập</a>
-           <a class="btn btn-primary btn-sm ms-2" href="/user/register.html"><i class="bi bi-person-plus me-1"></i>Đăng ký</a>`;
+           <button id="logout-btn" type="button" class="btn btn-outline-danger btn-sm ms-1 py-1" title="Đăng xuất"><i class="bi bi-box-arrow-right"></i><span class="app-nav-text ms-1 d-none d-md-inline">Thoát</span></button>`
+        : `<a class="btn btn-outline-primary btn-sm ms-1 py-1" href="/user/login.html" title="Đăng nhập"><i class="bi bi-box-arrow-in-right"></i><span class="app-nav-text ms-1 d-none d-sm-inline">Đăng nhập</span></a>
+           <a class="btn btn-primary btn-sm ms-1 py-1" href="/user/register.html" title="Đăng ký"><i class="bi bi-person-plus"></i><span class="app-nav-text ms-1 d-none d-sm-inline">Đăng ký</span></a>`;
     nav.innerHTML = `${links}${authPart}`;
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
@@ -161,42 +179,66 @@ async function initSearchPage() {
 async function initProfilePage(auth) {
     const id = new URLSearchParams(window.location.search).get("id");
     const box = document.getElementById("profile-container");
-    if (!id || !box) return;
-    const res = await apiFetch(`/api/companions/${id}`);
-    const companion = await res.json();
-    const name = companion.user?.fullName || companion.user?.username || "Companion";
-    const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chưa có đánh giá";
-    box.innerHTML = `
-        <div class="card user-card"><div class="card-body">
-          ${companion.avatarUrl ? `<img src="${escapeHtml(companion.avatarUrl)}" alt="avatar" class="img-fluid rounded mb-3" style="max-height:220px;object-fit:cover;">` : ""}
-          <h1 class="h4 mb-1">${escapeHtml(name)}</h1>
-          <div class="mb-3 text-warning fw-bold">${rating}</div>
-          <p><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chưa có")}</p>
-          <p><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
-          <p><strong>Ngoại hình:</strong> ${escapeHtml(companion.appearance || "Chưa có")}</p>
-          <p><strong>Thời gian rảnh:</strong> ${escapeHtml(companion.availability || "Chưa có")}</p>
-          <p><strong>Dịch vụ:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Rank:</strong> ${escapeHtml(companion.gameRank || "-")}</p>
-          <p><strong>Khu vực:</strong> ${escapeHtml(companion.area || "-")} | <strong>Giới tính:</strong> ${escapeHtml(companion.gender || "-")}</p>
-          <p><strong>Tỷ lệ phản hồi:</strong> ${Number(companion.responseRate || 0).toFixed(0)}%</p>
-          ${companion.introVideoUrl ? `<a class="btn btn-sm btn-outline-dark mb-3" href="${escapeHtml(companion.introVideoUrl)}" target="_blank">Xem video giới thiệu</a>` : ""}
-          <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-primary" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
-            <a class="btn btn-outline-secondary" href="/user/review.html">Đánh giá</a>
-            <a class="btn btn-outline-warning" href="/user/report.html?reportedUserId=${companion.user?.id || ""}">Tố cáo / SOS</a>
-            ${auth.authenticated ? `<button id="add-favorite-btn" class="btn btn-outline-danger">Thêm yêu thích</button>` : ""}
-          </div>
-          <div id="profile-message" class="mt-3"></div>
-        </div></div>`;
-    const addBtn = document.getElementById("add-favorite-btn");
-    if (addBtn) {
-        addBtn.addEventListener("click", async () => {
-            const response = await apiFetch(`/api/favorites/${companion.id}`, { method: "POST", headers: {} });
-            if (response.ok) {
-                setMessage("profile-message", "success", "Đã thêm vào yêu thích");
-            } else {
-                setMessage("profile-message", "danger", "Thêm yêu thích thất bại");
-            }
-        });
+    if (!box) return;
+    if (!id) {
+        box.innerHTML = `<div class="empty-state">Không tìm thấy companion. Thiếu tham số <code>id</code>.</div>`;
+        return;
+    }
+    try {
+        const res = await apiFetch(`/api/companions/${id}`);
+        const companion = res.ok ? await res.json() : null;
+        if (!companion || !companion.user) {
+            box.innerHTML = `<div class="empty-state">Không tìm thấy companion phù hợp.</div>`;
+            return;
+        }
+
+        const name = companion.user?.fullName || companion.user?.username || "Companion";
+        const avg = companion.averageRating;
+        const reviewCount = companion.reviewCount || 0;
+        const hasRating = avg !== null && avg !== undefined && !Number.isNaN(Number(avg));
+        const ratingText = hasRating ? `${Number(avg).toFixed(1)} ★ (${reviewCount})` : "Chưa có đánh giá";
+
+        box.innerHTML = `
+            <div class="card user-card"><div class="card-body">
+              ${
+                  companion.avatarUrl
+                      ? `<img src="${escapeHtml(companion.avatarUrl)}" alt="avatar" class="img-fluid rounded mb-3" style="max-height:220px;object-fit:cover;">`
+                      : `<div class="d-flex align-items-center justify-content-center rounded mb-3" style="height:220px;background:linear-gradient(135deg,#6366f1,#8b5cf6);">
+                            <i class="bi bi-person-fill text-white" style="font-size:4rem;"></i>
+                         </div>`
+              }
+              <h1 class="h4 mb-1">${escapeHtml(name)}</h1>
+              <div class="mb-3 text-warning fw-bold">${escapeHtml(ratingText)}</div>
+              <p><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chưa có")}</p>
+              <p><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
+              <p><strong>Ngoại hình:</strong> ${escapeHtml(companion.appearance || "Chưa có")}</p>
+              <p><strong>Thời gian rảnh:</strong> ${escapeHtml(companion.availability || "Chưa có")}</p>
+              <p><strong>Dịch vụ:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Rank:</strong> ${escapeHtml(companion.gameRank || "-")}</p>
+              <p><strong>Khu vực:</strong> ${escapeHtml(companion.area || "-")} | <strong>Giới tính:</strong> ${escapeHtml(companion.gender || "-")}</p>
+              <p><strong>Tỷ lệ phản hồi:</strong> ${Number(companion.responseRate || 0).toFixed(0)}%</p>
+              ${companion.introVideoUrl ? `<a class="btn btn-sm btn-outline-dark mb-3" href="${escapeHtml(companion.introVideoUrl)}" target="_blank">Xem video giới thiệu</a>` : ""}
+              <div class="d-flex gap-2 flex-wrap">
+                <a class="btn btn-primary" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
+                <a class="btn btn-outline-secondary" href="/user/review.html">Đánh giá</a>
+                <a class="btn btn-outline-warning" href="/user/report.html?reportedUserId=${companion.user?.id || ""}">Tố cáo / SOS</a>
+                ${auth.authenticated ? `<button id="add-favorite-btn" class="btn btn-outline-danger">Thêm yêu thích</button>` : ""}
+              </div>
+              <div id="profile-message" class="mt-3"></div>
+            </div></div>`;
+
+        const addBtn = document.getElementById("add-favorite-btn");
+        if (addBtn) {
+            addBtn.addEventListener("click", async () => {
+                const response = await apiFetch(`/api/favorites/${companion.id}`, { method: "POST", headers: {} });
+                if (response.ok) {
+                    setMessage("profile-message", "success", "Đã thêm vào yêu thích");
+                } else {
+                    setMessage("profile-message", "danger", "Thêm yêu thích thất bại");
+                }
+            });
+        }
+    } catch (err) {
+        box.innerHTML = `<div class="empty-state">Không thể tải hồ sơ: ${escapeHtml(err?.message || err || '')}</div>`;
     }
 }
 
@@ -206,8 +248,23 @@ async function initBookingPage(auth) {
     const companionId = params.get("id");
     const companionSelect = document.getElementById("companionId");
     const serviceSelect = document.getElementById("servicePriceId");
+    const durationSelect = document.getElementById("duration");
     const servicePriceHint = document.getElementById("booking-service-price-hint");
+    const holdAmountHint = document.getElementById("booking-hold-amount-hint");
     let currentServices = [];
+
+    function renderHoldAmountHint() {
+        if (!holdAmountHint) return;
+        const selected = currentServices.find((s) => String(s.id) === String(serviceSelect?.value)) || currentServices[0];
+        const pricePerHour = Number(selected?.pricePerHour || 0);
+        const duration = Number(durationSelect?.value || 0);
+        if (!selected || !duration || duration < 30) {
+            holdAmountHint.textContent = "";
+            return;
+        }
+        const holdAmount = Math.round(pricePerHour * (duration / 60));
+        holdAmountHint.textContent = `Tiền cọc tạm giữ: ${holdAmount.toLocaleString("vi-VN")} VND`;
+    }
     const companions = await (async () => {
         const res = await apiFetch("/api/companions");
         return res.ok ? res.json() : [];
@@ -236,6 +293,7 @@ async function initBookingPage(auth) {
         if (!selectedCompanionId) {
             serviceSelect.innerHTML = `<option value="">Chọn companion để tải dịch vụ</option>`;
             if (servicePriceHint) servicePriceHint.textContent = "";
+            if (holdAmountHint) holdAmountHint.textContent = "";
             return;
         }
         const res = await apiFetch(`/api/companions/${selectedCompanionId}/service-prices`, { headers: {} });
@@ -243,6 +301,7 @@ async function initBookingPage(auth) {
         if (!currentServices.length) {
             serviceSelect.innerHTML = `<option value="">Companion chưa cấu hình dịch vụ</option>`;
             if (servicePriceHint) servicePriceHint.textContent = "Companion này chưa có dịch vụ cố định để đặt.";
+            if (holdAmountHint) holdAmountHint.textContent = "";
             return;
         }
         serviceSelect.innerHTML = currentServices.map((s) =>
@@ -252,6 +311,7 @@ async function initBookingPage(auth) {
             const first = currentServices[0];
             servicePriceHint.textContent = `Giá đang chọn: ${Number(first.pricePerHour || 0).toLocaleString("vi-VN")} VND/giờ`;
         }
+        renderHoldAmountHint();
     }
 
     companionSelect?.addEventListener("change", async () => {
@@ -262,9 +322,66 @@ async function initBookingPage(auth) {
         if (servicePriceHint && selected) {
             servicePriceHint.textContent = `Giá đang chọn: ${Number(selected.pricePerHour || 0).toLocaleString("vi-VN")} VND/giờ`;
         }
+        renderHoldAmountHint();
     });
+    durationSelect?.addEventListener("change", renderHoldAmountHint);
     await loadServicesByCompanion(Number(companionSelect.value));
     document.getElementById("bookingTime").value = toDateInputValue();
+
+    const locationEnabled = document.getElementById("locationEnabled");
+    const locationStreet = document.getElementById("locationStreet");
+    const locationProvince = document.getElementById("locationProvince");
+    const locationDistrict = document.getElementById("locationDistrict");
+
+    const provinceOptions = [
+        "TP. Hồ Chí Minh",
+        "Hà Nội",
+        "Đà Nẵng",
+        "Cần Thơ",
+        "Hải Phòng",
+        "Bình Dương",
+        "Đồng Nai",
+        "Khánh Hòa",
+        "Thừa Thiên Huế",
+        "An Giang"
+    ];
+    const districtByProvince = {
+        "TP. Hồ Chí Minh": ["Quận 1", "Quận 3", "Quận 4", "Quận 5", "Quận 7", "Quận 10", "Quận 11", "Quận 12", "TP Thủ Đức", "Bình Thạnh", "Gò Vấp", "Tân Bình", "Tân Phú", "Phú Nhuận", "Bình Tân"],
+        "Hà Nội": ["Ba Đình", "Hoàn Kiếm", "Hai Bà Trưng", "Đống Đa", "Cầu Giấy", "Thanh Xuân", "Hoàng Mai", "Long Biên", "Nam Từ Liêm", "Bắc Từ Liêm", "Hà Đông", "Tây Hồ"]
+    };
+
+    function setLocationEnabledState(enabled) {
+        if (locationStreet) locationStreet.disabled = !enabled;
+        if (locationProvince) locationProvince.disabled = !enabled;
+        if (locationDistrict) locationDistrict.disabled = !enabled;
+        if (!enabled) {
+            if (locationStreet) locationStreet.value = "";
+            if (locationProvince) locationProvince.value = "";
+            if (locationDistrict) locationDistrict.innerHTML = `<option value="">Chọn quận/huyện</option>`;
+        } else if (locationProvince?.value) {
+            renderDistrictOptions(locationProvince.value);
+        }
+    }
+
+    function renderProvinceOptions() {
+        if (!locationProvince) return;
+        locationProvince.innerHTML = `<option value="">Chọn tỉnh/thành</option>` + provinceOptions
+            .map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`)
+            .join("");
+    }
+
+    function renderDistrictOptions(province) {
+        if (!locationDistrict) return;
+        const list = districtByProvince[province] || ["Khác"];
+        locationDistrict.innerHTML = `<option value="">Chọn quận/huyện</option>` + list
+            .map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`)
+            .join("");
+    }
+
+    renderProvinceOptions();
+    setLocationEnabledState(Boolean(locationEnabled?.checked));
+    locationEnabled?.addEventListener("change", () => setLocationEnabledState(Boolean(locationEnabled.checked)));
+    locationProvince?.addEventListener("change", () => renderDistrictOptions(locationProvince.value));
 
     const imageInput = document.getElementById("bookingImage");
     const imagePreviewWrap = document.getElementById("booking-image-preview-wrap");
@@ -306,12 +423,19 @@ async function initBookingPage(auth) {
 
     document.getElementById("booking-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const location = (() => {
+            if (!locationEnabled?.checked) return "";
+            const street = (locationStreet?.value || "").trim();
+            const province = (locationProvince?.value || "").trim();
+            const district = (locationDistrict?.value || "").trim();
+            return [street, district, province].filter(Boolean).join(", ");
+        })();
         const payload = {
             companionId: Number(document.getElementById("companionId").value),
             servicePriceId: Number(document.getElementById("servicePriceId").value),
             bookingTime: document.getElementById("bookingTime").value,
             duration: Number(document.getElementById("duration").value),
-            location: document.getElementById("location").value,
+            location,
             note: document.getElementById("note").value
         };
         if (!payload.servicePriceId) {
@@ -322,7 +446,8 @@ async function initBookingPage(auth) {
         if (res.ok) {
             window.location.href = "/user/appointments.html";
         } else {
-            setMessage("booking-message", "danger", "Đặt lịch thất bại. Vui lòng kiểm tra thông tin.");
+            const errMsg = await parseApiErrorMessage(res, "Đặt lịch thất bại. Vui lòng kiểm tra thông tin.");
+            setMessage("booking-message", "danger", errMsg);
         }
     });
 }
