@@ -23,16 +23,16 @@
     <div class="admin-main">
         <header class="admin-topbar">
             <h1 class="h4 mb-0">Kiểm duyệt nội dung</h1>
-            <button class="btn btn-outline-light btn-sm" id="logout-btn">Đăng xuất</button>
+            <button class="btn btn-outline-light btn-sm" id="logout-btn" data-cy="admin-logout-btn">Đăng xuất</button>
         </header>
 
         <main class="admin-content">
-            <div id="admin-alert" class="mb-3"></div>
+            <div id="admin-alert" class="mb-3" data-cy="admin-alert"></div>
 
             <section class="card panel-card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>Hồ sơ Companion chờ duyệt</span>
-                    <button class="btn btn-sm btn-primary" id="reload-moderation-btn">Tải lại</button>
+                    <button class="btn btn-sm btn-primary" id="reload-moderation-btn" data-cy="reload-moderation-btn">Tải lại</button>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -45,7 +45,7 @@
                                 <th>Hành động</th>
                             </tr>
                             </thead>
-                            <tbody id="moderation-pending-body"></tbody>
+                            <tbody id="moderation-pending-body" data-cy="moderation-pending-body"></tbody>
                         </table>
                     </div>
                 </div>
@@ -66,7 +66,7 @@
                                 <th>Hành động</th>
                             </tr>
                             </thead>
-                            <tbody id="reviews-body"></tbody>
+                            <tbody id="reviews-body" data-cy="reviews-body"></tbody>
                         </table>
                     </div>
                 </div>

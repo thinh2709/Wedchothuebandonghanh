@@ -1,5 +1,9 @@
 async function requestJson(url, options = {}) {
     const response = await fetch(url, options);
+    if (response.status === 401 || response.status === 403) {
+        window.location.href = "/user/login.html";
+        throw new Error("Unauthorized");
+    }
     if (!response.ok) {
         const text = await response.text();
         let message = text;
@@ -27,6 +31,42 @@ function clearAlert() {
     }
 }
 
+function readAuthEvidence() {
+    const localRole = localStorage.getItem("role");
+    const sessionRole = sessionStorage.getItem("role");
+    const localUserId = localStorage.getItem("userId") || localStorage.getItem("user_id");
+    const sessionUserId = sessionStorage.getItem("userId") || sessionStorage.getItem("user_id");
+    const localToken = localStorage.getItem("token") || localStorage.getItem("jwt");
+    const sessionToken = sessionStorage.getItem("token") || sessionStorage.getItem("jwt");
+    const hasSessionCookie = document.cookie.includes("JSESSIONID=");
+
+    return {
+        role: sessionRole || localRole,
+        hasUserId: Boolean(localUserId || sessionUserId),
+        hasToken: Boolean(localToken || sessionToken),
+        hasSessionCookie
+    };
+}
+
+async function ensureAdminAccess() {
+    try {
+        const me = await requestJson("/api/auth/me", { method: "GET" });
+        if (!me?.authenticated || me.role !== "ADMIN") {
+            window.location.href = "/user/login.html";
+            return false;
+        }
+        return true;
+    } catch (_) {
+        const auth = readAuthEvidence();
+        const hasAdminSignal = auth.role === "ADMIN" && (auth.hasUserId || auth.hasToken || auth.hasSessionCookie);
+        if (hasAdminSignal) {
+            return true;
+        }
+        window.location.href = "/user/login.html";
+        return false;
+    }
+}
+
 function formatMoney(value) {
     const number = Number(value || 0);
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(number);
@@ -39,6 +79,40 @@ function escapeHtml(text) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+function buildUserActionButtons(userId) {
+    const template = document.getElementById("user-actions-template");
+    if (template?.content) {
+        const fragment = template.content.cloneNode(true);
+        fragment.querySelectorAll("button[data-action]").forEach((button) => {
+            button.dataset.id = String(userId);
+        });
+        return fragment;
+    }
+
+    const fallback = document.createDocumentFragment();
+    const warnBtn = document.createElement("button");
+    warnBtn.className = "btn btn-sm btn-warning me-1";
+    warnBtn.dataset.action = "warn";
+    warnBtn.dataset.id = String(userId);
+    warnBtn.textContent = "Cảnh cáo";
+
+    const banBtn = document.createElement("button");
+    banBtn.className = "btn btn-sm btn-danger me-1";
+    banBtn.dataset.action = "ban";
+    banBtn.dataset.id = String(userId);
+    banBtn.textContent = "Khóa";
+
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "btn btn-sm btn-success";
+    resetBtn.dataset.action = "reset-status";
+    resetBtn.dataset.id = String(userId);
+    resetBtn.setAttribute("data-cy", "btn-reset-status");
+    resetBtn.textContent = "Bình thường";
+
+    fallback.append(warnBtn, banBtn, resetBtn);
+    return fallback;
 }
 
 function bindLogout() {
@@ -124,11 +198,12 @@ async function loadUsersPage() {
             <td>${escapeHtml(user.email)}</td>
             <td>${escapeHtml(user.role)}</td>
             <td><span class="badge ${user.flag === "BANNED" ? "text-bg-danger" : user.flag === "WARNED" ? "text-bg-warning" : "text-bg-secondary"}">${escapeHtml(user.flag === "BANNED" ? "Đã khóa" : user.flag === "WARNED" ? "Đã cảnh cáo" : "Bình thường")}</span></td>
-            <td>
-                <button class="btn btn-sm btn-warning me-1" data-action="warn" data-id="${user.id}">Cảnh cáo</button>
-                <button class="btn btn-sm btn-danger" data-action="ban" data-id="${user.id}">Khóa</button>
-            </td>
+            <td class="user-actions-cell"></td>
         `;
+        const actionsCell = tr.querySelector(".user-actions-cell");
+        if (actionsCell) {
+            actionsCell.appendChild(buildUserActionButtons(user.id));
+        }
         usersBody.appendChild(tr);
     });
 
@@ -150,12 +225,31 @@ async function loadUsersPage() {
     usersBody.querySelectorAll('button[data-action="ban"]').forEach((btn) => {
         btn.addEventListener("click", () => updateUserFlag(btn.dataset.id, "ban"));
     });
+    usersBody.querySelectorAll('button[data-action="reset-status"]').forEach((btn) => {
+        btn.addEventListener("click", () => updateUserFlag(btn.dataset.id, "reset-status"));
+    });
 }
 
 async function updateUserFlag(userId, action) {
-    const endpoint = action === "warn" ? "warn" : "ban";
-    await requestJson(`/api/admin/users/${userId}/${endpoint}`, { method: "POST" });
-    showAlert(action === "warn" ? "Đã cảnh cáo tài khoản." : "Đã khóa tài khoản.");
+    let endpoint = "ban";
+    let method = "POST";
+    let successMessage = "Đã khóa tài khoản.";
+
+    if (action === "warn") {
+        endpoint = "warn";
+        successMessage = "Đã cảnh cáo tài khoản.";
+    } else if (action === "reset-status") {
+        const confirmed = window.confirm("Bạn có chắc chắn muốn khôi phục trạng thái bình thường cho người dùng này không?");
+        if (!confirmed) {
+            return;
+        }
+        endpoint = "reset-status";
+        method = "PUT";
+        successMessage = "Đã khôi phục trạng thái bình thường cho tài khoản.";
+    }
+
+    await requestJson(`/api/admin/users/${userId}/${endpoint}`, { method });
+    showAlert(successMessage);
     await loadUsersPage();
 }
 
@@ -356,7 +450,12 @@ async function bootstrapAdminPage() {
     }
 }
 
-bootstrapAdminPage().catch((error) => {
-    console.error(error);
-    showAlert("Không thể tải dữ liệu admin. Vui lòng thử lại.", "danger");
+ensureAdminAccess().then((allowed) => {
+    if (!allowed) {
+        return;
+    }
+    bootstrapAdminPage().catch((error) => {
+        console.error(error);
+        showAlert("Không thể tải dữ liệu admin. Vui lòng thử lại.", "danger");
+    });
 });
