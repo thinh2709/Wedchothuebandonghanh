@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 @Service
 public class AdminService {
@@ -42,8 +43,13 @@ public class AdminService {
     private final Set<Long> hiddenReviewIds = ConcurrentHashMap.newKeySet();
     private final Map<Long, String> disputeActions = new ConcurrentHashMap<>();
 
-    public List<Companion> getPendingCompanions() {
-        return companionRepository.findByStatus(Companion.Status.PENDING);
+    public List<Companion> getPendingCompanions(String keyword) {
+        List<Companion> list = companionRepository.findByStatus(Companion.Status.PENDING);
+        if (isBlankKeyword(keyword)) {
+            return list;
+        }
+        String k = normalizeKeyword(keyword);
+        return list.stream().filter((c) -> pendingCompanionMatchesKeyword(c, k)).toList();
     }
 
     public Companion approveCompanion(Long id) {
@@ -82,7 +88,7 @@ public class AdminService {
         return stats;
     }
 
-    public Map<String, Object> getUsersData() {
+    public Map<String, Object> getUsersData(String keyword) {
         List<Map<String, Object>> users = new ArrayList<>();
         for (User user : userRepository.findAll()) {
             Map<String, Object> item = new HashMap<>();
@@ -110,6 +116,12 @@ public class AdminService {
                             : companion.getUser().getModerationFlag().name()
             );
             companions.add(item);
+        }
+
+        if (!isBlankKeyword(keyword)) {
+            String k = normalizeKeyword(keyword);
+            users = users.stream().filter((row) -> adminUserRowMatches(row, k)).toList();
+            companions = companions.stream().filter((row) -> adminCompanionRowMatches(row, k)).toList();
         }
 
         Map<String, Object> response = new HashMap<>();
@@ -141,7 +153,7 @@ public class AdminService {
         return Map.of("message", "Đã khôi phục trạng thái bình thường", "userId", userId, "flag", "NONE");
     }
 
-    public List<Map<String, Object>> getReviewsForModeration() {
+    public List<Map<String, Object>> getReviewsForModeration(String keyword) {
         List<Review> reviews = entityManager.createQuery(
                         "select r from Review r order by r.createdAt desc",
                         Review.class
@@ -158,6 +170,10 @@ public class AdminService {
             item.put("bookingId", review.getBooking() == null ? null : review.getBooking().getId());
             response.add(item);
         }
+        if (!isBlankKeyword(keyword)) {
+            String k = normalizeKeyword(keyword);
+            response = response.stream().filter((row) -> moderationReviewRowMatches(row, k)).toList();
+        }
         return response;
     }
 
@@ -170,7 +186,7 @@ public class AdminService {
         return Map.of("message", "Đã ẩn đánh giá vi phạm", "reviewId", reviewId, "hidden", true);
     }
 
-    public Map<String, Object> getTransactionManagementData() {
+    public Map<String, Object> getTransactionManagementData(String keyword) {
         List<Map<String, Object>> withdrawals = new ArrayList<>();
         for (Withdrawal withdrawal : withdrawalRepository.findByStatusOrderByCreatedAtDesc(Withdrawal.Status.PENDING)) {
             Map<String, Object> item = new HashMap<>();
@@ -189,6 +205,10 @@ public class AdminService {
                             : "Không xác định"
             );
             withdrawals.add(item);
+        }
+        if (!isBlankKeyword(keyword)) {
+            String k = normalizeKeyword(keyword);
+            withdrawals = withdrawals.stream().filter((row) -> withdrawalRowMatches(row, k)).toList();
         }
         return Map.of("commissionRate", commissionRate, "pendingWithdrawals", withdrawals);
     }
@@ -278,5 +298,69 @@ public class AdminService {
             throw new RuntimeException("Không tìm thấy tố cáo");
         }
         return report;
+    }
+
+    private static boolean isBlankKeyword(String keyword) {
+        return keyword == null || keyword.trim().isEmpty();
+    }
+
+    private static String normalizeKeyword(String keyword) {
+        return keyword.trim().toLowerCase();
+    }
+
+    private static boolean textContainsIgnoreCase(String text, String keywordLower) {
+        return text != null && text.toLowerCase().contains(keywordLower);
+    }
+
+    private static boolean idOrNumberMatches(Object id, String keywordLower) {
+        return String.valueOf(id).toLowerCase().contains(keywordLower);
+    }
+
+    private boolean pendingCompanionMatchesKeyword(Companion c, String k) {
+        User u = c.getUser();
+        return Stream.of(
+                        u != null ? u.getUsername() : null,
+                        u != null ? u.getEmail() : null,
+                        u != null ? u.getFullName() : null,
+                        c.getBio()
+                )
+                .anyMatch((t) -> textContainsIgnoreCase(t, k))
+                || idOrNumberMatches(c.getId(), k);
+    }
+
+    private boolean adminUserRowMatches(Map<String, Object> row, String k) {
+        return textContainsIgnoreCase(String.valueOf(row.getOrDefault("username", "")), k)
+                || textContainsIgnoreCase(String.valueOf(row.getOrDefault("email", "")), k)
+                || textContainsIgnoreCase(String.valueOf(row.getOrDefault("fullName", "")), k)
+                || idOrNumberMatches(row.get("id"), k);
+    }
+
+    private boolean adminCompanionRowMatches(Map<String, Object> row, String k) {
+        return textContainsIgnoreCase(String.valueOf(row.getOrDefault("username", "")), k)
+                || textContainsIgnoreCase(String.valueOf(row.getOrDefault("bio", "")), k)
+                || idOrNumberMatches(row.get("id"), k)
+                || idOrNumberMatches(row.get("userId"), k);
+    }
+
+    private boolean moderationReviewRowMatches(Map<String, Object> row, String k) {
+        if (idOrNumberMatches(row.get("id"), k)) {
+            return true;
+        }
+        Object bookingId = row.get("bookingId");
+        if (bookingId != null && String.valueOf(bookingId).toLowerCase().contains(k)) {
+            return true;
+        }
+        return textContainsIgnoreCase(String.valueOf(row.getOrDefault("comment", "")), k)
+                || String.valueOf(row.getOrDefault("rating", "")).toLowerCase().contains(k);
+    }
+
+    private boolean withdrawalRowMatches(Map<String, Object> row, String k) {
+        return idOrNumberMatches(row.get("id"), k)
+                || textContainsIgnoreCase(String.valueOf(row.getOrDefault("companionName", "")), k)
+                || textContainsIgnoreCase(String.valueOf(row.getOrDefault("bankName", "")), k)
+                || textContainsIgnoreCase(String.valueOf(row.getOrDefault("bankAccountNumber", "")), k)
+                || textContainsIgnoreCase(String.valueOf(row.getOrDefault("accountHolderName", "")), k)
+                || String.valueOf(row.getOrDefault("amount", "")).toLowerCase().contains(k)
+                || String.valueOf(row.getOrDefault("status", "")).toLowerCase().contains(k);
     }
 }

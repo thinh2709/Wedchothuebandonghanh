@@ -21,9 +21,11 @@ public class AdminController {
     private AdminService adminService;
 
     @GetMapping("/pending-companions")
-    public List<Companion> getPendingCompanions(HttpServletRequest request) {
+    public List<Companion> getPendingCompanions(
+            @RequestParam(required = false) String keyword,
+            HttpServletRequest request) {
         assertAdmin(request);
-        return adminService.getPendingCompanions();
+        return adminService.getPendingCompanions(keyword);
     }
 
     @PostMapping("/approve-companion/{id}")
@@ -45,9 +47,11 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public Map<String, Object> getUsersData(HttpServletRequest request) {
+    public Map<String, Object> getUsersData(
+            @RequestParam(required = false) String keyword,
+            HttpServletRequest request) {
         assertAdmin(request);
-        return adminService.getUsersData();
+        return adminService.getUsersData(keyword);
     }
 
     @PostMapping("/users/{id}/warn")
@@ -69,9 +73,11 @@ public class AdminController {
     }
 
     @GetMapping("/moderation/reviews")
-    public List<Map<String, Object>> getReviewsForModeration(HttpServletRequest request) {
+    public List<Map<String, Object>> getReviewsForModeration(
+            @RequestParam(required = false) String keyword,
+            HttpServletRequest request) {
         assertAdmin(request);
-        return adminService.getReviewsForModeration();
+        return adminService.getReviewsForModeration(keyword);
     }
 
     @PostMapping("/moderation/reviews/{id}/hide")
@@ -81,9 +87,11 @@ public class AdminController {
     }
 
     @GetMapping("/transactions")
-    public Map<String, Object> getTransactionManagementData(HttpServletRequest request) {
+    public Map<String, Object> getTransactionManagementData(
+            @RequestParam(required = false) String keyword,
+            HttpServletRequest request) {
         assertAdmin(request);
-        return adminService.getTransactionManagementData();
+        return adminService.getTransactionManagementData(keyword);
     }
 
     @PutMapping("/transactions/commission-rate")

@@ -81,6 +81,29 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
+function getPageSearchKeyword() {
+    return document.querySelector('[data-cy="search-input"]')?.value?.trim() || "";
+}
+
+function wireAdminSearch(runSearch) {
+    const input = document.querySelector('[data-cy="search-input"]');
+    const btn = document.querySelector('[data-cy="search-btn"]');
+    if (!input || !btn) {
+        return;
+    }
+    const go = () => {
+        clearAlert();
+        runSearch();
+    };
+    btn.addEventListener("click", go);
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            go();
+        }
+    });
+}
+
 const adminChartState = {
     range: "month",
     eventsChart: null,
@@ -341,12 +364,24 @@ async function loadAdminDashboardCharts() {
     }
 }
 
-async function loadPendingCompanions(tableBodyId) {
+function resolvePendingCompanionsKeyword(explicitKeyword, tableBodyId) {
+    if (explicitKeyword !== undefined && explicitKeyword !== null) {
+        return String(explicitKeyword).trim();
+    }
+    if (window.location.pathname.endsWith("/moderation.html") && tableBodyId === "moderation-pending-body") {
+        return getPageSearchKeyword();
+    }
+    return "";
+}
+
+async function loadPendingCompanions(tableBodyId, explicitKeyword) {
     const rows = document.getElementById(tableBodyId);
     if (!rows) {
         return;
     }
-    const data = await requestJson("/api/admin/pending-companions");
+    const kw = resolvePendingCompanionsKeyword(explicitKeyword, tableBodyId);
+    const q = kw ? `?keyword=${encodeURIComponent(kw)}` : "";
+    const data = await requestJson(`/api/admin/pending-companions${q}`);
     rows.innerHTML = "";
 
     if (!data.length) {
@@ -399,10 +434,12 @@ async function moderateCompanion(id, isApprove, tableBodyId) {
     }
 }
 
-async function loadUsersPage() {
+async function loadUsersPage(keyword) {
     const usersBody = document.getElementById("users-body");
     const companionsBody = document.getElementById("companions-body");
-    const data = await requestJson("/api/admin/users");
+    const k = keyword !== undefined && keyword !== null ? String(keyword).trim() : getPageSearchKeyword();
+    const q = k ? `?keyword=${encodeURIComponent(k)}` : "";
+    const data = await requestJson(`/api/admin/users${q}`);
     usersBody.innerHTML = "";
     companionsBody.innerHTML = "";
 
@@ -469,11 +506,13 @@ async function updateUserFlag(userId, action) {
     await loadUsersPage();
 }
 
-async function loadModerationPage() {
-    await loadPendingCompanions("moderation-pending-body");
+async function loadModerationPage(keyword) {
+    const k = keyword !== undefined && keyword !== null ? String(keyword).trim() : getPageSearchKeyword();
+    await loadPendingCompanions("moderation-pending-body", k);
 
     const reviewsBody = document.getElementById("reviews-body");
-    const reviews = await requestJson("/api/admin/moderation/reviews");
+    const rq = k ? `?keyword=${encodeURIComponent(k)}` : "";
+    const reviews = await requestJson(`/api/admin/moderation/reviews${rq}`);
     reviewsBody.innerHTML = "";
     if (!reviews.length) {
         reviewsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có review cần xử lý.</td></tr>';
@@ -506,8 +545,10 @@ async function hideReview(reviewId) {
     await loadModerationPage();
 }
 
-async function loadTransactionsPage() {
-    const data = await requestJson("/api/admin/transactions");
+async function loadTransactionsPage(keyword) {
+    const k = keyword !== undefined && keyword !== null ? String(keyword).trim() : getPageSearchKeyword();
+    const q = k ? `?keyword=${encodeURIComponent(k)}` : "";
+    const data = await requestJson(`/api/admin/transactions${q}`);
     const commissionInput = document.getElementById("commission-rate");
     if (commissionInput) {
         commissionInput.value = data.commissionRate ?? 0.15;
@@ -516,7 +557,7 @@ async function loadTransactionsPage() {
     const tbody = document.getElementById("withdrawals-body");
     tbody.innerHTML = "";
     if (!data.pendingWithdrawals.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có lệnh rút tiền chờ duyệt.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Không có lệnh rút tiền chờ duyệt.</td></tr>';
         return;
     }
 
@@ -805,18 +846,21 @@ function setupPageEvents() {
             clearAlert();
             await loadUsersPage();
         });
+        wireAdminSearch(() => loadUsersPage());
     }
     if (path.endsWith("/moderation.html")) {
         document.getElementById("reload-moderation-btn")?.addEventListener("click", async () => {
             clearAlert();
             await loadModerationPage();
         });
+        wireAdminSearch(() => loadModerationPage());
     }
     if (path.endsWith("/transactions.html")) {
         document.getElementById("reload-transactions-btn")?.addEventListener("click", async () => {
             clearAlert();
             await loadTransactionsPage();
         });
+        wireAdminSearch(() => loadTransactionsPage());
         document.getElementById("commission-form")?.addEventListener("submit", saveCommissionRate);
     }
     if (path.endsWith("/disputes.html")) {
@@ -830,35 +874,8 @@ function setupPageEvents() {
 async function bootstrapAdminPage() {
     bindLogout();
     setupPageEvents();
-    let me = null;
-    try {
-        me = await requestJson("/api/auth/me");
-    } catch (_) {
-        me = null;
-    }
     await pollAdminRealtimeNotifications();
-    if (me?.userId && window.RealtimeStomp) {
-        try {
-            await RealtimeStomp.ensureLibs();
-            await RealtimeStomp.connect();
-            await RealtimeStomp.subscribeNotifications(Number(me.userId), (n) => {
-                const id = Number(n.id);
-                if (!adminRealtimeNotifState.seenIds.has(id)) {
-                    adminRealtimeNotifState.seenIds.add(id);
-                    if (isSosNotification(n)) {
-                        showAdminSosAlarm(n);
-                    } else {
-                        showAdminToast(n);
-                    }
-                }
-            });
-        } catch (e) {
-            console.warn("WebSocket thông báo admin không khả dụng, dùng polling", e);
-            if (!adminRealtimeNotifState.timer) {
-                adminRealtimeNotifState.timer = setInterval(pollAdminRealtimeNotifications, 4000);
-            }
-        }
-    } else if (!adminRealtimeNotifState.timer) {
+    if (!adminRealtimeNotifState.timer) {
         adminRealtimeNotifState.timer = setInterval(pollAdminRealtimeNotifications, 4000);
     }
 
