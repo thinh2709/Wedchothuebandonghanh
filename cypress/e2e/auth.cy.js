@@ -11,7 +11,7 @@ describe('Auth Flow', () => {
     cy.get('#password').type(password);
     cy.get('#confirm-password').type('654321');
     cy.get('#register-form').submit();
-    cy.contains('Mat khau nhap lai khong khop.');
+    cy.contains(/Mật khẩu nhập lại không khớp\.|Mat khau nhap lai khong khop\./);
   });
 
   it('registers a new user successfully', () => {
@@ -23,7 +23,7 @@ describe('Auth Flow', () => {
     cy.get('#register-form').submit();
     cy.url().should('include', '/login');
     cy.url().should('include', 'registered=1');
-    cy.contains('Dang ky thanh cong. Vui long dang nhap.');
+    cy.contains(/Đăng ký thành công.*đăng nhập|Dang ky thanh cong.*dang nhap/);
   });
 
   it('fails login with wrong password', () => {

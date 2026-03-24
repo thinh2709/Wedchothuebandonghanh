@@ -32,35 +32,35 @@ describe('Companion Flow', () => {
     loginUser();
 
     cy.visit('/companion/register.html');
-    cy.get('#bio').type('Toi la companion test tu Cypress');
-    cy.get('#hobbies').type('doc sach, xem phim');
-    cy.get('#appearance').type('lich su');
-    cy.get('#availability').type('toi thu 2-6');
+    cy.get('#bio').type('Tôi là companion test từ Cypress');
+    cy.get('#hobbies').type('đọc sách, xem phim');
+    cy.get('#appearance').type('lịch sự');
+    cy.get('#availability').type('tối thứ 2-6');
     cy.get('#register-form').submit();
 
-    cy.contains('Gui dang ky thanh cong');
+    cy.contains(/Gửi đăng ký thành công|Gui dang ky thanh cong/);
     cy.url({ timeout: 10000 }).should('include', '/companion/dashboard.html');
-    cy.contains('Khu vuc Companion');
+    cy.contains(/Khu vực Companion|Khu vuc Companion/);
   });
 
   it('updates profile and toggles online', () => {
     loginUser();
     cy.visit('/companion/dashboard.html');
 
-    cy.get('#bio').clear().type('Cap nhat tieu su tu test');
-    cy.get('#hobbies').clear().type('du lich');
-    cy.get('#appearance').clear().type('than thien');
-    cy.get('#availability-text').clear().type('ca ngay cuoi tuan');
+    cy.get('#bio').clear().type('Cập nhật tiểu sử từ test');
+    cy.get('#hobbies').clear().type('du lịch');
+    cy.get('#appearance').clear().type('thân thiện');
+    cy.get('#availability-text').clear().type('cả ngày cuối tuần');
     cy.get('#identity-number').clear().type('079123456789');
     cy.get('#identity-image-url').clear().type('https://example.com/cccd.jpg');
     cy.get('#portrait-image-url').clear().type('https://example.com/portrait.jpg');
     cy.get('#intro-media-urls').clear().type('https://example.com/intro1.jpg,https://example.com/intro2.mp4');
-    cy.get('#skills').clear().type('tro chuyen, outing');
+    cy.get('#skills').clear().type('trò chuyện, outing');
     cy.get('#profile-form').submit();
-    cy.contains('Da cap nhat ho so companion.');
+    cy.contains(/Đã cập nhật hồ sơ companion\.|Da cap nhat ho so companion\./);
 
     cy.get('#online-toggle').click({ force: true });
-    cy.contains('Da cap nhat trang thai online.');
+    cy.contains(/Đã cập nhật trạng thái online\.|Da cap nhat trang thai online\./);
   });
 
   it('manages availability slots', () => {
@@ -71,11 +71,11 @@ describe('Companion Flow', () => {
     cy.get('#end-time').type('2026-03-30T11:00');
     cy.get('#note').type('slot test cypress');
     cy.get('#availability-form').submit();
-    cy.contains('Da them khung gio ranh.');
+    cy.contains(/Đã thêm khung giờ rảnh\.|Da them khung gio ranh\./);
     cy.get('#availability-body').should('contain.text', 'slot test cypress');
 
     cy.get('#availability-body button').first().click();
-    cy.contains('Da xoa khung gio ranh.');
+    cy.contains(/Đã xóa khung giờ rảnh\.|Da xoa khung gio ranh\./);
   });
 
   it('manages service prices', () => {
@@ -84,13 +84,13 @@ describe('Companion Flow', () => {
 
     cy.get('#service-name').type('Test service');
     cy.get('#service-price').type('150');
-    cy.get('#service-description').type('mo ta test');
+    cy.get('#service-description').type('mô tả test');
     cy.get('#service-price-form').submit();
-    cy.contains('Da them bang gia dich vu.');
+    cy.contains(/Đã thêm bảng giá dịch vụ\.|Da them bang gia dich vu\./);
     cy.get('#service-price-body').should('contain.text', 'Test service');
 
     cy.get('#service-price-body button').first().click();
-    cy.contains('Da xoa bang gia.');
+    cy.contains(/Đã xóa bảng giá\.|Da xoa bang gia\./);
   });
 
   it('loads workflow, consultations and income widgets', () => {
@@ -120,8 +120,10 @@ describe('Companion Flow', () => {
     cy.get('#alert-box .alert').invoke('text').then((text) => {
       const normalized = text.toLowerCase();
       expect(
+        normalized.includes('đã tạo lệnh rút tiền') ||
         normalized.includes('da tao lenh rut tien') ||
         normalized.includes('insufficient available balance') ||
+        normalized.includes('không thể rút tiền') ||
         normalized.includes('khong the rut tien')
       ).to.eq(true);
     });

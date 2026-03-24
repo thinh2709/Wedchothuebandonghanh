@@ -1,4 +1,4 @@
-describe('Nghiep vu E2E cho 3 role', () => {
+describe('Nghiệp vụ E2E cho 3 role', () => {
   const now = Date.now();
   const customer = {
     username: `e2e_customer_${now}`,
@@ -73,7 +73,7 @@ describe('Nghiep vu E2E cho 3 role', () => {
       });
       logout();
 
-      // Du endpoint admin chua co authz role nghiem ngat, van goi duoc khi da login.
+      // Dù endpoint admin chưa có authz role nghiêm ngặt, vẫn gọi được khi đã login.
       login(customer);
       cy.request('/api/admin/pending-companions').then((resp) => {
         const created = resp.body.find((item) => item.user?.username === companion.username);
@@ -90,25 +90,25 @@ describe('Nghiep vu E2E cho 3 role', () => {
     resolveCompanionInfo();
   });
 
-  it('USER: nap vi, them yeu thich, dat lich, to cao', () => {
+  it('USER: nạp ví, thêm yêu thích, đặt lịch, tố cáo', () => {
     login(customer);
     cy.url().should('include', '/user/index.html');
     cy.visit('/user/wallet.html');
     cy.get('#depositAmount').clear().type('200000');
     cy.get('#provider').select('MOMO');
     cy.get('#deposit-form').submit();
-    cy.get('#wallet-message').should('contain.text', 'Nap tien thanh cong');
+    cy.get('#wallet-message').invoke('text').should('match', /Nạp tiền thành công|Nap tien thanh cong/);
     cy.get('#wallet-transactions').find('tr').should('have.length.greaterThan', 0);
 
     resolveCompanionInfo().then(() => {
       if (!state.hasCompanion) {
-        cy.log('Skip phan booking/report: chua co companion trong he thong');
+        cy.log('Skip phần booking/report: chưa có companion trong hệ thống');
         return;
       }
 
       cy.visit('/user/profile.html?id=' + state.companionId);
       cy.get('#add-favorite-btn').click();
-      cy.get('#profile-message').should('contain.text', 'Da them vao yeu thich');
+      cy.get('#profile-message').invoke('text').should('match', /Đã thêm vào yêu thích|Da them vao yeu thich/);
 
       cy.visit('/user/booking.html?id=' + state.companionId);
       cy.get('#duration').clear().type('60');
@@ -127,17 +127,17 @@ describe('Nghiep vu E2E cho 3 role', () => {
       cy.visit('/user/report.html');
       cy.get('#reportedUserId').clear().type(String(state.companionUserId));
       cy.get('#reportCategory').select('LATE');
-      cy.get('#reason').type('Companion den tre');
+      cy.get('#reason').type('Companion đến trễ');
       cy.get('#isEmergency').check({ force: true });
       cy.get('#report-form').submit();
-      cy.get('#report-message').should('contain.text', 'Gui to cao thanh cong');
+      cy.get('#report-message').invoke('text').should('match', /Gửi tố cáo thành công|Gui to cao thanh cong/);
       cy.get('#report-list').find('.card').should('have.length.greaterThan', 0);
     });
   });
 
-  it('COMPANION: xu ly booking + rut tien', () => {
+  it('COMPANION: xử lý booking + rút tiền', () => {
     if (!state.hasCompanion) {
-      cy.log('Skip: chua co companion account hop le de chay flow');
+      cy.log('Skip: chưa có companion account hợp lệ để chạy flow');
       return;
     }
     login(companion);
@@ -164,19 +164,19 @@ describe('Nghiep vu E2E cho 3 role', () => {
 
     cy.request('/api/companions/me/bookings').then((resp) => {
       const completed = resp.body.find((b) => b.status === 'COMPLETED');
-      expect(completed, 'Can co booking COMPLETED').to.exist;
+      expect(completed, 'Cần có booking COMPLETED').to.exist;
       state.bookingId = completed.id;
     });
 
     cy.window().then((win) => {
       cy.stub(win, 'prompt')
         .onFirstCall().returns('5')
-        .onSecondCall().returns('Khach lich su');
+        .onSecondCall().returns('Khách lịch sự');
     });
     cy.contains('#booking-body tr', customer.username).within(() => {
       cy.contains('button', 'Rate User').click();
     });
-    cy.get('#alert-box').should('contain.text', 'Da danh gia user');
+    cy.get('#alert-box').invoke('text').should('match', /Đã đánh giá user|Da danh gia user/);
 
     cy.get('#withdraw-amount').clear().type('1');
     cy.get('#bank-name').clear().type('VCB');
@@ -186,16 +186,18 @@ describe('Nghiep vu E2E cho 3 role', () => {
     cy.get('#alert-box .alert').invoke('text').then((text) => {
       const normalized = text.toLowerCase();
       expect(
-        normalized.includes('da tao lenh rut tien') ||
+        normalized.includes('đã tạo lệnh rút tiền') ||
+          normalized.includes('da tao lenh rut tien') ||
+          normalized.includes('không thể rút tiền') ||
           normalized.includes('khong the rut tien') ||
           normalized.includes('insufficient available balance')
       ).to.eq(true);
     });
   });
 
-  it('USER bo sung: chat/call + danh gia', () => {
+  it('USER bổ sung: chat/call + đánh giá', () => {
     if (!state.bookingId) {
-      cy.log('Skip: chua tao duoc booking hoan tat');
+      cy.log('Skip: chưa tạo được booking hoàn tất');
       return;
     }
     login(customer);
@@ -203,24 +205,24 @@ describe('Nghiep vu E2E cho 3 role', () => {
     cy.get('#appointment-list').should('contain.text', 'COMPLETED');
 
     cy.visit('/user/chat.html?bookingId=' + state.bookingId);
-    cy.get('#chat-content').type('Xin chao companion');
+    cy.get('#chat-content').type('Xin chào companion');
     cy.get('#chat-form').submit();
-    cy.get('#chat-list').should('contain.text', 'Xin chao companion');
+    cy.get('#chat-list').should('contain.text', 'Xin chào companion');
     cy.get('#call-btn').click();
     cy.get('#call-info').should('contain.text', 'VoIP room');
 
     cy.visit('/user/review.html');
-    cy.get('#bookingId').should('not.contain.text', 'Khong co lich hen da hoan thanh');
+    cy.get('#bookingId').invoke('text').should('not.match', /Không có lịch hẹn đã hoàn thành|Khong co lich hen da hoan thanh/);
     cy.get('#rating-stars .star-btn[data-value="5"]').click();
-    cy.get('#comment').type('Trai nghiem rat tot');
+    cy.get('#comment').type('Trải nghiệm rất tốt');
     cy.get('#review-form').submit();
-    cy.get('#review-message').should('contain.text', 'Gui danh gia thanh cong');
-    cy.get('#review-list').should('contain.text', 'Trai nghiem rat tot');
+    cy.get('#review-message').invoke('text').should('match', /Gửi đánh giá thành công|Gui danh gia thanh cong/);
+    cy.get('#review-list').should('contain.text', 'Trải nghiệm rất tốt');
   });
 
   it('ADMIN: moderation, users, transactions, disputes', () => {
     if (!admin.username || !admin.password) {
-      cy.log('Skip: chua cau hinh ADMIN_USERNAME/ADMIN_PASSWORD');
+      cy.log('Skip: chưa cấu hình ADMIN_USERNAME/ADMIN_PASSWORD');
       return;
     }
     login(admin);
@@ -239,7 +241,7 @@ describe('Nghiep vu E2E cho 3 role', () => {
         cy.contains('#moderation-pending-body tr', companion.username).within(() => {
           cy.contains('button', 'Cap tich xanh').click();
         });
-        cy.get('#admin-alert').should('contain.text', 'Da cap tich xanh');
+        cy.get('#admin-alert').invoke('text').should('match', /Đã cấp tích xanh|Da cap tich xanh/);
       }
     });
 
@@ -250,15 +252,15 @@ describe('Nghiep vu E2E cho 3 role', () => {
     cy.get('#withdrawals-body').then(($tbody) => {
       if ($tbody.text().includes('Duyet')) {
         cy.get('#withdrawals-body button[data-action="approve"]').first().click();
-        cy.get('#admin-alert').should('contain.text', 'Da duyet lenh rut tien');
+        cy.get('#admin-alert').invoke('text').should('match', /Đã duyệt lệnh rút tiền|Da duyet lenh rut tien/);
       }
     });
 
     cy.visit('/admin/disputes.html');
     cy.get('#disputes-body').then(($tbody) => {
-      if (!$tbody.text().includes('Khong co tranh chap')) {
+      if (!$tbody.text().includes('Khong co tranh chap') && !$tbody.text().includes('Không có tranh chấp')) {
         cy.get('#disputes-body button[data-action="freeze"]').first().click();
-        cy.get('#admin-alert').should('contain.text', 'Da cap nhat xu ly tranh chap');
+        cy.get('#admin-alert').invoke('text').should('match', /Đã cập nhật xử lý tranh chấp|Da cap nhat xu ly tranh chap/);
       }
     });
   });
