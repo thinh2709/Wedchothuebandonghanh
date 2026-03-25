@@ -7,7 +7,9 @@ import com.hutech.nguyenphucthinh.model.Review;
 import com.hutech.nguyenphucthinh.model.Transaction;
 import com.hutech.nguyenphucthinh.model.User;
 import com.hutech.nguyenphucthinh.model.Withdrawal;
+import com.hutech.nguyenphucthinh.repository.BookingRepository;
 import com.hutech.nguyenphucthinh.repository.CompanionRepository;
+import com.hutech.nguyenphucthinh.repository.ReportRepository;
 import com.hutech.nguyenphucthinh.repository.TransactionRepository;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
 import com.hutech.nguyenphucthinh.repository.WithdrawalRepository;
@@ -36,6 +38,10 @@ public class AdminService {
     private TransactionRepository transactionRepository;
     @Autowired
     private WithdrawalRepository withdrawalRepository;
+    @Autowired
+    private ReportRepository reportRepository;
+    @Autowired
+    private BookingRepository bookingRepository;
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -192,6 +198,8 @@ public class AdminService {
             Map<String, Object> item = new HashMap<>();
             item.put("id", withdrawal.getId());
             item.put("amount", withdrawal.getAmount());
+            item.put("commissionAmount", withdrawal.getCommissionAmount());
+            item.put("netAmount", withdrawal.getNetAmount());
             item.put("createdAt", withdrawal.getCreatedAt());
             item.put("status", withdrawal.getStatus());
             item.put("bankName", withdrawal.getBankName());
@@ -210,7 +218,18 @@ public class AdminService {
             String k = normalizeKeyword(keyword);
             withdrawals = withdrawals.stream().filter((row) -> withdrawalRowMatches(row, k)).toList();
         }
-        return Map.of("commissionRate", commissionRate, "pendingWithdrawals", withdrawals);
+        /** Mọi lệnh rút (mọi trạng thái), chỉ dùng createdAt cho biểu đồ thống kê — tránh chỉ còn PENDING làm méo so với review. */
+        List<Map<String, Object>> withdrawalChartEvents = new ArrayList<>();
+        for (Withdrawal w : withdrawalRepository.findAll()) {
+            Map<String, Object> ev = new HashMap<>();
+            ev.put("createdAt", w.getCreatedAt());
+            withdrawalChartEvents.add(ev);
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("commissionRate", commissionRate);
+        out.put("pendingWithdrawals", withdrawals);
+        out.put("withdrawalChartEvents", withdrawalChartEvents);
+        return out;
     }
 
     public Map<String, Object> updateCommissionRate(BigDecimal rate) {
@@ -219,6 +238,11 @@ public class AdminService {
         }
         commissionRate = rate.setScale(4, RoundingMode.HALF_UP);
         return Map.of("message", "Đã cập nhật commission rate", "commissionRate", commissionRate);
+    }
+
+    /** Tỷ lệ hoa hồng áp dụng khi companion rút tiền (0–1). */
+    public BigDecimal getCommissionRate() {
+        return commissionRate;
     }
 
     public Map<String, Object> approveWithdrawal(Long withdrawalId) {
@@ -242,11 +266,7 @@ public class AdminService {
     }
 
     public List<Map<String, Object>> getDisputes() {
-        List<Report> reports = entityManager.createQuery(
-                        "select r from Report r order by r.createdAt desc",
-                        Report.class
-                )
-                .getResultList();
+        List<Report> reports = reportRepository.findAllByOrderByCreatedAtDesc();
         List<Map<String, Object>> response = new ArrayList<>();
         for (Report report : reports) {
             Map<String, Object> item = new HashMap<>();
@@ -271,7 +291,7 @@ public class AdminService {
     public Map<String, Object> refundToUser(Long reportId) {
         Report report = validateReportExists(reportId);
         report.setStatus(Report.Status.RESOLVED);
-        entityManager.merge(report);
+        reportRepository.save(report);
         disputeActions.put(reportId, "REFUND_TO_USER");
         return Map.of("message", "Đã hoàn tiền cho người dùng", "reportId", reportId, "action", "REFUND_TO_USER");
     }
@@ -279,7 +299,7 @@ public class AdminService {
     public Map<String, Object> payoutToCompanion(Long reportId) {
         Report report = validateReportExists(reportId);
         report.setStatus(Report.Status.RESOLVED);
-        entityManager.merge(report);
+        reportRepository.save(report);
         disputeActions.put(reportId, "PAYOUT_TO_COMPANION");
         return Map.of("message", "Đã trả tiền cho companion", "reportId", reportId, "action", "PAYOUT_TO_COMPANION");
     }
@@ -287,17 +307,89 @@ public class AdminService {
     public Map<String, Object> closeDispute(Long reportId) {
         Report report = validateReportExists(reportId);
         report.setStatus(Report.Status.RESOLVED);
-        entityManager.merge(report);
+        reportRepository.save(report);
         disputeActions.put(reportId, "CLOSED");
         return Map.of("message", "Đã đóng tranh chấp", "reportId", reportId, "action", "CLOSED");
     }
 
-    private Report validateReportExists(Long reportId) {
-        Report report = entityManager.find(Report.class, reportId);
-        if (report == null) {
-            throw new RuntimeException("Không tìm thấy tố cáo");
+    /** Đơn đang diễn ra / đã chấp nhận — admin theo dõi GPS & check-in. */
+    public List<Map<String, Object>> getTrackableBookings() {
+        List<Booking> list = bookingRepository.findByStatusInOrderByBookingTimeDesc(
+                List.of(Booking.Status.ACCEPTED, Booking.Status.IN_PROGRESS));
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Booking b : list) {
+            out.add(toBookingTrackingSummary(b));
         }
-        return report;
+        return out;
+    }
+
+    public Map<String, Object> getBookingTrackingDetail(Long bookingId) {
+        Booking b = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
+        return toBookingTrackingDetail(b);
+    }
+
+    private Map<String, Object> toBookingTrackingSummary(Booking b) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", b.getId());
+        m.put("status", b.getStatus().name());
+        m.put("bookingTime", b.getBookingTime() != null ? b.getBookingTime().toString() : null);
+        m.put("rentalVenue", b.getRentalVenue());
+        m.put("customerUsername", b.getCustomer() != null ? b.getCustomer().getUsername() : "");
+        m.put(
+                "companionUsername",
+                b.getCompanion() != null && b.getCompanion().getUser() != null
+                        ? b.getCompanion().getUser().getUsername()
+                        : ""
+        );
+        m.put("liveLatitude", b.getLiveLatitude());
+        m.put("liveLongitude", b.getLiveLongitude());
+        m.put("liveLocationAt", b.getLiveLocationAt() != null ? b.getLiveLocationAt().toString() : null);
+        m.put("liveLocationRole", b.getLiveLocationRole());
+        return m;
+    }
+
+    private Map<String, Object> toBookingTrackingDetail(Booking b) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", b.getId());
+        m.put("status", b.getStatus().name());
+        m.put("bookingTime", b.getBookingTime() != null ? b.getBookingTime().toString() : null);
+        m.put("startedAt", b.getStartedAt() != null ? b.getStartedAt().toString() : null);
+        m.put("completedAt", b.getCompletedAt() != null ? b.getCompletedAt().toString() : null);
+        m.put("location", b.getLocation());
+        m.put("rentalVenue", b.getRentalVenue());
+        m.put("customerUsername", b.getCustomer() != null ? b.getCustomer().getUsername() : "");
+        m.put(
+                "companionUsername",
+                b.getCompanion() != null && b.getCompanion().getUser() != null
+                        ? b.getCompanion().getUser().getUsername()
+                        : ""
+        );
+        m.put("customerCheckIn", gpsPoint(b.getCustomerCheckInLatitude(), b.getCustomerCheckInLongitude()));
+        m.put("companionCheckIn", gpsPoint(b.getCompanionCheckInLatitude(), b.getCompanionCheckInLongitude()));
+        m.put("mergedCheckIn", gpsPoint(b.getCheckInLatitude(), b.getCheckInLongitude()));
+        Map<String, Object> live = new HashMap<>();
+        live.put("latitude", b.getLiveLatitude());
+        live.put("longitude", b.getLiveLongitude());
+        live.put("at", b.getLiveLocationAt() != null ? b.getLiveLocationAt().toString() : null);
+        live.put("role", b.getLiveLocationRole());
+        m.put("live", live);
+        m.put("customerCheckOut", gpsPoint(b.getCustomerCheckOutLatitude(), b.getCustomerCheckOutLongitude()));
+        m.put("companionCheckOut", gpsPoint(b.getCompanionCheckOutLatitude(), b.getCompanionCheckOutLongitude()));
+        m.put("checkOut", gpsPoint(b.getCheckOutLatitude(), b.getCheckOutLongitude()));
+        return m;
+    }
+
+    private static Map<String, Object> gpsPoint(Double lat, Double lng) {
+        Map<String, Object> p = new HashMap<>();
+        p.put("latitude", lat);
+        p.put("longitude", lng);
+        p.put("set", lat != null && lng != null && !Double.isNaN(lat) && !Double.isNaN(lng));
+        return p;
+    }
+
+    private Report validateReportExists(Long reportId) {
+        return reportRepository.findById(reportId).orElseThrow(() -> new RuntimeException("Không tìm thấy tố cáo"));
     }
 
     private static boolean isBlankKeyword(String keyword) {

@@ -92,7 +92,6 @@ describe('Nghiệp vụ E2E chi tiết cho 3 role', () => {
         area: 'Quận 1',
         rentalVenues: 'Quán cafe trung tâm\nCông viên Lê Văn Tám',
         gender: 'Nữ',
-        gameRank: 'Kim cương',
         onlineStatus: 'true',
       },
     });
@@ -194,10 +193,46 @@ describe('Nghiệp vụ E2E chi tiết cho 3 role', () => {
         body: { status: 'ACCEPTED' },
       }).its('status').should('eq', 200);
 
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: customer.username, password: customer.password },
+      }).its('status').should('eq', 200);
+      cy.request({
+        method: 'PATCH',
+        url: `/api/bookings/me/${bookingId}/check-in`,
+        body: { lat: '10.762622', lng: '106.660172' },
+      }).its('status').should('eq', 200);
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: companion.username, password: companion.password },
+      }).its('status').should('eq', 200);
+
       cy.request({
         method: 'POST',
         url: `/api/companions/me/bookings/${bookingId}/checkin`,
         body: { lat: '10.762622', lng: '106.660172' },
+      }).its('status').should('eq', 200);
+
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: customer.username, password: customer.password },
+      }).its('status').should('eq', 200);
+      cy.request({
+        method: 'PATCH',
+        url: `/api/bookings/me/${bookingId}/check-out`,
+        body: { lat: '10.762622', lng: '106.660172' },
+      }).its('status').should('eq', 200);
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: companion.username, password: companion.password },
       }).its('status').should('eq', 200);
 
       cy.request({
@@ -218,19 +253,6 @@ describe('Nghiệp vụ E2E chi tiết cho 3 role', () => {
       state.completedBookingId = completed.id;
     });
 
-    cy.window().then((win) => {
-      cy.stub(win, 'prompt')
-        .onFirstCall().returns('5')
-        .onSecondCall().returns('Khách lịch sự');
-    });
-    cy.then(() => {
-      cy.request({
-        method: 'POST',
-        url: `/api/companions/me/bookings/${state.pendingBookingId}/rate-user`,
-        body: { rating: 5, review: 'Khách lịch sự' },
-      }).its('status').should('eq', 200);
-    });
-
     cy.intercept('PUT', '/api/companions/me/bank-account').as('saveBankApi');
     cy.intercept('POST', '/api/companions/me/withdrawals').as('createWithdrawalApi');
     cy.visit('/companion/finance.html');
@@ -241,7 +263,7 @@ describe('Nghiệp vụ E2E chi tiết cho 3 role', () => {
     cy.wait('@saveBankApi').its('response.statusCode').should('eq', 200);
     cy.get('#alert-box').invoke('text').should('match', /lưu|ngân hàng/i);
 
-    cy.get('#withdraw-amount').clear().type('1');
+    cy.get('#withdraw-amount').clear().type('10000');
     cy.get('#withdraw-form').submit();
     cy.wait('@createWithdrawalApi').its('response.statusCode').should('eq', 200);
     cy.get('#alert-box').invoke('text').should('match', /lệnh rút|tạo/i);
@@ -286,10 +308,50 @@ describe('Nghiệp vụ E2E chi tiết cho 3 role', () => {
         body: { status: 'ACCEPTED' },
         failOnStatusCode: false,
       });
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: customer.username, password: customer.password },
+        failOnStatusCode: false,
+      });
+      cy.request({
+        method: 'PATCH',
+        url: `/api/bookings/me/${pendingId}/check-in`,
+        body: { lat: '10.762622', lng: '106.660172' },
+        failOnStatusCode: false,
+      });
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: companion.username, password: companion.password },
+        failOnStatusCode: false,
+      });
       cy.request({
         method: 'POST',
         url: `/api/companions/me/bookings/${pendingId}/checkin`,
         body: { lat: '10.762622', lng: '106.660172' },
+        failOnStatusCode: false,
+      });
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: customer.username, password: customer.password },
+        failOnStatusCode: false,
+      });
+      cy.request({
+        method: 'PATCH',
+        url: `/api/bookings/me/${pendingId}/check-out`,
+        body: { lat: '10.762622', lng: '106.660172' },
+        failOnStatusCode: false,
+      });
+      apiLogout();
+      cy.request({
+        method: 'POST',
+        url: '/api/user/login',
+        body: { username: companion.username, password: companion.password },
         failOnStatusCode: false,
       });
       cy.request({

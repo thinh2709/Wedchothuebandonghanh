@@ -1,5 +1,15 @@
 async function requestJson(url, options = {}) {
-    const response = await fetch(url, options);
+    const merged = {
+        credentials: "same-origin",
+        ...options,
+        headers: {
+            ...(options.headers || {}),
+        },
+    };
+    if (merged.body != null && typeof merged.body === "string" && !merged.headers["Content-Type"]) {
+        merged.headers["Content-Type"] = "application/json";
+    }
+    const response = await fetch(url, merged);
     if (response.status === 401 || response.status === 403) {
         window.location.href = "/user/login.html";
         throw new Error("Unauthorized");
@@ -13,7 +23,15 @@ async function requestJson(url, options = {}) {
         } catch (_) {}
         throw new Error(message);
     }
-    return response.json();
+    const text = await response.text();
+    if (!text || !text.trim()) {
+        return null;
+    }
+    try {
+        return JSON.parse(text);
+    } catch (_) {
+        return null;
+    }
 }
 
 function showAlert(message, type = "success") {
@@ -242,7 +260,6 @@ function renderCompanionReviewDetail(item) {
             <div class="col-md-6"><div><strong>Dịch vụ:</strong> ${escapeHtml(item?.serviceType || "-")}</div></div>
             <div class="col-md-6"><div><strong>Khu vực:</strong> ${escapeHtml(item?.area || "-")}</div></div>
             <div class="col-md-6"><div><strong>Giới tính:</strong> ${escapeHtml(item?.gender || "-")}</div></div>
-            <div class="col-md-6"><div><strong>Hạng game:</strong> ${escapeHtml(item?.gameRank || "-")}</div></div>
             <div class="col-12"><div><strong>Tiểu sử:</strong><div class="text-muted mt-1">${escapeHtml(item?.bio || "-")}</div></div></div>
             <div class="col-12"><div><strong>Sở thích:</strong><div class="text-muted mt-1">${escapeHtml(item?.hobbies || "-")}</div></div></div>
             <div class="col-12"><div><strong>Ngoại hình:</strong><div class="text-muted mt-1">${escapeHtml(item?.appearance || "-")}</div></div></div>
@@ -343,18 +360,21 @@ async function loadAdminDashboardCharts() {
     const range = rangeEl?.value || adminChartState.range || "month";
     adminChartState.range = range;
 
-    if (!adminChartState.payload) {
-        const [reviews, disputes, tx] = await Promise.all([
-            requestJson("/api/admin/moderation/reviews"),
-            requestJson("/api/admin/disputes"),
-            requestJson("/api/admin/transactions")
-        ]);
-        adminChartState.payload = {
-            reviews: Array.isArray(reviews) ? reviews : [],
-            disputes: Array.isArray(disputes) ? disputes : [],
-            withdrawals: Array.isArray(tx?.pendingWithdrawals) ? tx.pendingWithdrawals : []
-        };
-    }
+    const [reviews, disputes, tx] = await Promise.all([
+        requestJson("/api/admin/moderation/reviews"),
+        requestJson("/api/admin/disputes"),
+        requestJson("/api/admin/transactions")
+    ]);
+    const withdrawalForChart = Array.isArray(tx?.withdrawalChartEvents)
+        ? tx.withdrawalChartEvents
+        : Array.isArray(tx?.pendingWithdrawals)
+          ? tx.pendingWithdrawals
+          : [];
+    adminChartState.payload = {
+        reviews: Array.isArray(reviews) ? reviews : [],
+        disputes: Array.isArray(disputes) ? disputes : [],
+        withdrawals: withdrawalForChart
+    };
 
     const buckets = buildAdminBuckets(range);
     const labels = buckets.map((b) => b.label);
@@ -375,10 +395,18 @@ async function loadAdminDashboardCharts() {
                 datasets: [
                     { label: "Review mới", data: reviewSeries, borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,.15)", tension: 0.3, fill: true },
                     { label: "Tranh chấp", data: disputeSeries, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,.12)", tension: 0.3, fill: true },
-                    { label: "Yêu cầu rút tiền", data: withdrawalSeries, borderColor: "#0ea5e9", backgroundColor: "rgba(14,165,233,.12)", tension: 0.3, fill: true }
+                    { label: "Lệnh rút tiền", data: withdrawalSeries, borderColor: "#0ea5e9", backgroundColor: "rgba(14,165,233,.12)", tension: 0.3, fill: true }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        onClick: () => {}
+                    }
+                }
+            }
         });
     }
 
@@ -388,7 +416,7 @@ async function loadAdminDashboardCharts() {
         adminChartState.sourceChart = new Chart(sourceCtx, {
             type: "doughnut",
             data: {
-                labels: ["Review", "Tranh chấp", "Rút tiền"],
+                labels: ["Review", "Tranh chấp", "Lệnh rút tiền"],
                 datasets: [{
                     data: [
                         reviewSeries.reduce((a, b) => a + b, 0),
@@ -398,7 +426,15 @@ async function loadAdminDashboardCharts() {
                     backgroundColor: ["#8b5cf6", "#ef4444", "#0ea5e9"]
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        onClick: () => {}
+                    }
+                }
+            }
         });
     }
 }
@@ -596,18 +632,22 @@ async function loadTransactionsPage(keyword) {
     const tbody = document.getElementById("withdrawals-body");
     tbody.innerHTML = "";
     if (!data.pendingWithdrawals.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Không có lệnh rút tiền chờ duyệt.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Không có lệnh rút tiền chờ duyệt.</td></tr>';
         return;
     }
 
     data.pendingWithdrawals.forEach((item) => {
         const tr = document.createElement("tr");
+        const comm = item.commissionAmount != null ? formatMoney(item.commissionAmount) : "—";
+        const net = item.netAmount != null ? formatMoney(item.netAmount) : formatMoney(item.amount);
         tr.innerHTML = `
             <td>${item.id}</td>
             <td>${escapeHtml(item.companionName || "")}</td>
             <td>${escapeHtml(item.bankName || "")}</td>
             <td>${escapeHtml(item.bankAccountNumber || "")}</td>
             <td>${formatMoney(item.amount)}</td>
+            <td>${comm}</td>
+            <td>${net}</td>
             <td><span class="badge text-bg-warning">${escapeHtml(item.status)}</span></td>
             <td>
                 <button class="btn btn-sm btn-success me-1" data-action="approve" data-id="${item.id}">Duyệt</button>
@@ -650,7 +690,7 @@ async function loadDisputesPage() {
     const disputes = await requestJson("/api/admin/disputes");
     const tbody = document.getElementById("disputes-body");
     tbody.innerHTML = "";
-    if (!disputes.length) {
+    if (!disputes || !disputes.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có tranh chấp.</td></tr>';
         return;
     }
@@ -664,17 +704,21 @@ async function loadDisputesPage() {
             <td>${escapeHtml(dispute.reason || "")}</td>
             <td><span class="badge ${dispute.status === "RESOLVED" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(dispute.status)}</span></td>
             <td class="action-group">
-                <button class="btn btn-sm btn-secondary" data-action="freeze" data-id="${dispute.id}">Đóng băng ký quỹ</button>
-                <button class="btn btn-sm btn-outline-primary" data-action="refund" data-id="${dispute.id}">Hoàn tiền</button>
-                <button class="btn btn-sm btn-outline-success" data-action="payout" data-id="${dispute.id}">Thanh toán</button>
-                <button class="btn btn-sm btn-dark" data-action="close" data-id="${dispute.id}">Đóng hồ sơ</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-action="freeze" data-report-id="${dispute.id}">Đóng băng ký quỹ</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-action="refund" data-report-id="${dispute.id}">Hoàn tiền</button>
+                <button type="button" class="btn btn-sm btn-outline-success" data-action="payout" data-report-id="${dispute.id}">Thanh toán</button>
+                <button type="button" class="btn btn-sm btn-dark" data-action="close" data-report-id="${dispute.id}">Đóng hồ sơ</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 
-    tbody.querySelectorAll("button[data-action]").forEach((btn) => {
-        btn.addEventListener("click", () => processDispute(btn.dataset.id, btn.dataset.action));
+    tbody.querySelectorAll('button[data-action][data-report-id]').forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const reportId = btn.getAttribute("data-report-id");
+            const action = btn.getAttribute("data-action");
+            processDispute(reportId, action);
+        });
     });
 }
 
@@ -686,9 +730,313 @@ async function processDispute(id, action) {
         close: "close"
     };
     const endpoint = map[action];
-    await requestJson(`/api/admin/disputes/${id}/${endpoint}`, { method: "POST" });
-    showAlert("Đã cập nhật xử lý tranh chấp.");
-    await loadDisputesPage();
+    if (!id || !endpoint) {
+        showAlert("Thiếu thông tin hành động.", "danger");
+        return;
+    }
+    try {
+        await requestJson(`/api/admin/disputes/${encodeURIComponent(id)}/${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+        });
+        showAlert("Đã cập nhật xử lý tranh chấp.");
+        await loadDisputesPage();
+    } catch (err) {
+        showAlert(err?.message || "Thao tác thất bại.", "danger");
+    }
+}
+
+const adminTrackingState = {
+    map: null,
+    markersLayer: null,
+    trailLayer: null,
+    liveMarker: null,
+    subscription: null,
+    pollTimer: null,
+    trailCoords: [],
+    selectedId: null,
+};
+
+function teardownAdminTrackingLive() {
+    if (adminTrackingState.subscription && typeof adminTrackingState.subscription.unsubscribe === "function") {
+        try {
+            adminTrackingState.subscription.unsubscribe();
+        } catch (_) {
+            /* ignore */
+        }
+    }
+    adminTrackingState.subscription = null;
+    if (adminTrackingState.pollTimer) {
+        clearInterval(adminTrackingState.pollTimer);
+        adminTrackingState.pollTimer = null;
+    }
+}
+
+function ensureAdminTrackingMap() {
+    if (adminTrackingState.map || typeof L === "undefined") {
+        return;
+    }
+    const el = document.getElementById("admin-tracking-map");
+    if (!el) {
+        return;
+    }
+    adminTrackingState.map = L.map("admin-tracking-map").setView([10.762622, 106.660172], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap",
+        maxZoom: 19,
+    }).addTo(adminTrackingState.map);
+    adminTrackingState.markersLayer = L.layerGroup().addTo(adminTrackingState.map);
+}
+
+function clearAdminTrackingMapLayers() {
+    if (adminTrackingState.markersLayer) {
+        adminTrackingState.markersLayer.clearLayers();
+    }
+    if (adminTrackingState.trailLayer && adminTrackingState.map) {
+        adminTrackingState.map.removeLayer(adminTrackingState.trailLayer);
+        adminTrackingState.trailLayer = null;
+    }
+    adminTrackingState.liveMarker = null;
+    adminTrackingState.trailCoords = [];
+}
+
+function addAdminTrackingCircleMarker(lat, lng, color, label) {
+    if (lat == null || lng == null || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) {
+        return null;
+    }
+    const m = L.circleMarker([Number(lat), Number(lng)], {
+        radius: 9,
+        color,
+        weight: 2,
+        fillColor: color,
+        fillOpacity: 0.35,
+    });
+    m.bindPopup(label);
+    m.addTo(adminTrackingState.markersLayer);
+    return m;
+}
+
+function renderAdminTrackingDetail(detail) {
+    const info = document.getElementById("admin-tracking-detail");
+    if (!info) {
+        return;
+    }
+    const st = detail.status || "";
+    const cIn = detail.customerCheckIn || {};
+    const pIn = detail.companionCheckIn || {};
+    const merged = detail.mergedCheckIn || {};
+    const live = detail.live || {};
+    const cOut = detail.customerCheckOut || {};
+    const pOut = detail.companionCheckOut || {};
+    const co = detail.checkOut || {};
+    info.innerHTML = `
+        <div class="small">
+            <div><strong>Đơn #${detail.id}</strong> · <span class="badge text-bg-secondary">${escapeHtml(st)}</span></div>
+            <div class="text-muted mt-1">Khách: ${escapeHtml(detail.customerUsername || "")} · Companion: ${escapeHtml(
+        detail.companionUsername || ""
+    )}</div>
+            <div class="mt-2"><strong>Điểm check-in</strong></div>
+            <ul class="mb-1 ps-3">
+                <li>Khách: ${cIn.set ? `${Number(cIn.latitude).toFixed(5)}, ${Number(cIn.longitude).toFixed(5)}` : "chưa có"}</li>
+                <li>Companion: ${pIn.set ? `${Number(pIn.latitude).toFixed(5)}, ${Number(pIn.longitude).toFixed(5)}` : "chưa có"}</li>
+                <li>Sau đối chiếu (điểm hẹn): ${merged.set ? `${Number(merged.latitude).toFixed(5)}, ${Number(merged.longitude).toFixed(5)}` : "chưa có"}</li>
+            </ul>
+            <div class="mt-2"><strong>Điểm check-out</strong></div>
+            <ul class="mb-1 ps-3">
+                <li>Khách: ${cOut.set ? `${Number(cOut.latitude).toFixed(5)}, ${Number(cOut.longitude).toFixed(5)}` : "chưa có"}</li>
+                <li>Companion: ${pOut.set ? `${Number(pOut.latitude).toFixed(5)}, ${Number(pOut.longitude).toFixed(5)}` : "chưa có"}</li>
+                <li>Sau đối chiếu (hoàn tất): ${co.set ? `${Number(co.latitude).toFixed(5)}, ${Number(co.longitude).toFixed(5)}` : "chưa có"}</li>
+            </ul>
+            <div><strong>Vị trí live gần nhất</strong>: ${
+                live.latitude != null && live.longitude != null
+                    ? `${Number(live.latitude).toFixed(5)}, ${Number(live.longitude).toFixed(5)} (${escapeHtml(live.role || "")})`
+                    : "chưa có"
+            }</div>
+        </div>
+    `;
+}
+
+function fitAdminTrackingBoundsFromDetail(detail) {
+    const pts = [];
+    const push = (lat, lng) => {
+        if (lat != null && lng != null && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng))) {
+            pts.push([Number(lat), Number(lng)]);
+        }
+    };
+    const cIn = detail.customerCheckIn || {};
+    const pIn = detail.companionCheckIn || {};
+    const merged = detail.mergedCheckIn || {};
+    const live = detail.live || {};
+    const cOut = detail.customerCheckOut || {};
+    const pOut = detail.companionCheckOut || {};
+    const co = detail.checkOut || {};
+    push(cIn.latitude, cIn.longitude);
+    push(pIn.latitude, pIn.longitude);
+    push(merged.latitude, merged.longitude);
+    push(live.latitude, live.longitude);
+    push(cOut.latitude, cOut.longitude);
+    push(pOut.latitude, pOut.longitude);
+    push(co.latitude, co.longitude);
+    if (!pts.length || !adminTrackingState.map) {
+        return;
+    }
+    if (pts.length === 1) {
+        adminTrackingState.map.setView(pts[0], 15);
+    } else {
+        adminTrackingState.map.fitBounds(pts, { padding: [40, 40], maxZoom: 16 });
+    }
+}
+
+function drawAdminTrackingStaticMarkers(detail) {
+    clearAdminTrackingMapLayers();
+    const cIn = detail.customerCheckIn || {};
+    const pIn = detail.companionCheckIn || {};
+    const merged = detail.mergedCheckIn || {};
+    const live = detail.live || {};
+    const cOut = detail.customerCheckOut || {};
+    const pOut = detail.companionCheckOut || {};
+    const co = detail.checkOut || {};
+    addAdminTrackingCircleMarker(cIn.latitude, cIn.longitude, "#2563eb", "Check-in khách");
+    addAdminTrackingCircleMarker(pIn.latitude, pIn.longitude, "#16a34a", "Check-in companion");
+    addAdminTrackingCircleMarker(merged.latitude, merged.longitude, "#7c3aed", "Điểm hẹn sau đối chiếu");
+    addAdminTrackingCircleMarker(cOut.latitude, cOut.longitude, "#f97316", "Check-out khách");
+    addAdminTrackingCircleMarker(pOut.latitude, pOut.longitude, "#c2410c", "Check-out companion");
+    addAdminTrackingCircleMarker(co.latitude, co.longitude, "#64748b", "Check-out sau đối chiếu");
+    if (live.latitude != null && live.longitude != null) {
+        adminTrackingState.liveMarker = L.circleMarker([Number(live.latitude), Number(live.longitude)], {
+            radius: 10,
+            color: "#dc2626",
+            weight: 3,
+            fillColor: "#fecaca",
+            fillOpacity: 0.9,
+        });
+        adminTrackingState.liveMarker.bindPopup("Vị trí live (WebSocket + làm mới định kỳ)");
+        adminTrackingState.liveMarker.addTo(adminTrackingState.markersLayer);
+        adminTrackingState.trailCoords.push([Number(live.latitude), Number(live.longitude)]);
+        adminTrackingState.trailLayer = L.polyline(adminTrackingState.trailCoords, {
+            color: "#f97316",
+            weight: 3,
+            opacity: 0.85,
+        }).addTo(adminTrackingState.map);
+    }
+    fitAdminTrackingBoundsFromDetail(detail);
+}
+
+function appendAdminTrackingTrail(lat, lng) {
+    if (lat == null || lng == null || !adminTrackingState.map) {
+        return;
+    }
+    const la = Number(lat);
+    const ln = Number(lng);
+    if (Number.isNaN(la) || Number.isNaN(ln)) {
+        return;
+    }
+    adminTrackingState.trailCoords.push([la, ln]);
+    if (adminTrackingState.trailLayer) {
+        adminTrackingState.map.removeLayer(adminTrackingState.trailLayer);
+    }
+    adminTrackingState.trailLayer = L.polyline(adminTrackingState.trailCoords, {
+        color: "#f97316",
+        weight: 3,
+        opacity: 0.85,
+    }).addTo(adminTrackingState.map);
+    if (adminTrackingState.liveMarker) {
+        adminTrackingState.liveMarker.setLatLng([la, ln]);
+    } else {
+        adminTrackingState.liveMarker = L.circleMarker([la, ln], {
+            radius: 10,
+            color: "#dc2626",
+            weight: 3,
+            fillColor: "#fecaca",
+            fillOpacity: 0.9,
+        });
+        adminTrackingState.liveMarker.bindPopup("Vị trí live");
+        adminTrackingState.liveMarker.addTo(adminTrackingState.markersLayer);
+    }
+}
+
+async function subscribeAdminBookingLocation(bookingId) {
+    teardownAdminTrackingLive();
+    if (typeof RealtimeStomp === "undefined" || !RealtimeStomp.subscribeBookingLocation) {
+        return;
+    }
+    try {
+        adminTrackingState.subscription = await RealtimeStomp.subscribeBookingLocation(bookingId, (payload) => {
+            if (!payload || Number(payload.bookingId) !== Number(bookingId)) {
+                return;
+            }
+            appendAdminTrackingTrail(payload.latitude, payload.longitude);
+        });
+    } catch (e) {
+        console.warn("STOMP subscribe failed", e);
+    }
+    adminTrackingState.pollTimer = setInterval(async () => {
+        try {
+            if (!adminTrackingState.selectedId) {
+                return;
+            }
+            const d = await requestJson(`/api/admin/bookings/${adminTrackingState.selectedId}/tracking`);
+            renderAdminTrackingDetail(d);
+        } catch (_) {
+            /* ignore */
+        }
+    }, 12000);
+}
+
+async function selectBookingForTracking(bookingId) {
+    adminTrackingState.selectedId = bookingId;
+    const sid = document.getElementById("admin-tracking-selected-id");
+    if (sid) {
+        sid.textContent = String(bookingId);
+    }
+    const detail = await requestJson(`/api/admin/bookings/${bookingId}/tracking`);
+    renderAdminTrackingDetail(detail);
+    ensureAdminTrackingMap();
+    drawAdminTrackingStaticMarkers(detail);
+    await subscribeAdminBookingLocation(bookingId);
+}
+
+async function loadAdminTrackingList() {
+    const tbody = document.getElementById("admin-tracking-body");
+    if (!tbody) {
+        return;
+    }
+    const rows = await requestJson("/api/admin/bookings/tracking");
+    tbody.innerHTML = "";
+    if (!rows || !rows.length) {
+        tbody.innerHTML =
+            '<tr><td colspan="7" class="text-center text-muted">Không có đơn ACCEPTED / IN_PROGRESS.</td></tr>';
+        return;
+    }
+    rows.forEach((r) => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        const hasLive = r.liveLatitude != null && r.liveLongitude != null;
+        tr.innerHTML = `
+            <td>${r.id}</td>
+            <td><span class="badge ${r.status === "IN_PROGRESS" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(
+            r.status
+        )}</span></td>
+            <td>${escapeHtml(r.customerUsername || "")}</td>
+            <td>${escapeHtml(r.companionUsername || "")}</td>
+            <td>${escapeHtml(r.bookingTime || "")}</td>
+            <td>${escapeHtml(r.rentalVenue || "")}</td>
+            <td>${hasLive ? '<span class="text-success">Có</span>' : '<span class="text-muted">—</span>'}</td>
+        `;
+        tr.addEventListener("click", () => {
+            selectBookingForTracking(r.id).catch((e) => console.error(e));
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+async function initAdminTrackingPage() {
+    ensureAdminTrackingMap();
+    await loadAdminTrackingList();
+    if (adminTrackingState.map) {
+        setTimeout(() => adminTrackingState.map.invalidateSize(), 250);
+    }
 }
 
 function notifIcon(title) {
@@ -911,6 +1259,15 @@ function setupPageEvents() {
         wireAdminSearch(() => loadTransactionsPage());
         document.getElementById("commission-form")?.addEventListener("submit", saveCommissionRate);
     }
+    if (path.endsWith("/tracking.html")) {
+        document.getElementById("reload-tracking-btn")?.addEventListener("click", async () => {
+            clearAlert();
+            await loadAdminTrackingList();
+            if (adminTrackingState.selectedId) {
+                await selectBookingForTracking(adminTrackingState.selectedId);
+            }
+        });
+    }
     if (path.endsWith("/disputes.html")) {
         document.getElementById("reload-disputes-btn")?.addEventListener("click", async () => {
             clearAlert();
@@ -938,6 +1295,8 @@ async function bootstrapAdminPage() {
         await loadModerationPage();
     } else if (path.endsWith("/transactions.html")) {
         await loadTransactionsPage();
+    } else if (path.endsWith("/tracking.html")) {
+        await initAdminTrackingPage();
     } else if (path.endsWith("/disputes.html")) {
         await loadDisputesPage();
     } else if (path.endsWith("/notifications.html")) {

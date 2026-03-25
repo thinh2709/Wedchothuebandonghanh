@@ -113,6 +113,18 @@ public class AdminController {
         return adminService.rejectWithdrawal(id);
     }
 
+    @GetMapping("/bookings/tracking")
+    public List<Map<String, Object>> getTrackableBookings(HttpServletRequest request) {
+        assertAdmin(request);
+        return adminService.getTrackableBookings();
+    }
+
+    @GetMapping("/bookings/{id}/tracking")
+    public Map<String, Object> getBookingTrackingDetail(@PathVariable Long id, HttpServletRequest request) {
+        assertAdmin(request);
+        return adminService.getBookingTrackingDetail(id);
+    }
+
     @GetMapping("/disputes")
     public List<Map<String, Object>> getDisputes(HttpServletRequest request) {
         assertAdmin(request);

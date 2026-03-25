@@ -23,5 +23,10 @@ public class DatabaseMigration implements CommandLineRunner {
             );
         } catch (Exception ignored) {
         }
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE companions DROP COLUMN game_rank");
+        } catch (Exception ignored) {
+        }
     }
 }

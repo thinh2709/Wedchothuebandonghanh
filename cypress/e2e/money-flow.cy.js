@@ -103,7 +103,6 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
         area: 'TPHCM',
         rentalVenues: 'Quán cafe MoneyFlow\nCông viên MoneyFlow',
         gender: 'Khác',
-        gameRank: 'N/A',
         onlineStatus: 'true',
         avatarUrl: '',
         introVideoUrl: '',
@@ -226,11 +225,25 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
   });
 
   it('4. Check-in → Check-out: hoàn tất booking, tạo CHARGE + Transaction', () => {
+    const lat = 10.762622;
+    const lng = 106.660172;
+
+    apiLogin(customer);
+    cy.request({
+      method: 'PATCH',
+      url: `/api/bookings/me/${state.bookingId}/check-in`,
+      body: { lat, lng },
+    }).then((resp) => {
+      expect(resp.status).to.eq(200);
+      expect(resp.body.status).to.eq('ACCEPTED');
+    });
+    apiLogout();
+
     apiLogin(companionUser);
     cy.request({
       method: 'POST',
       url: `/api/companions/me/bookings/${state.bookingId}/checkin`,
-      body: { lat: '10.762622', lng: '106.660172' },
+      body: { lat: String(lat), lng: String(lng) },
     }).then((resp) => {
       expect(resp.status).to.eq(200);
       expect(resp.body.status).to.eq('IN_PROGRESS');
@@ -241,11 +254,25 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
     cy.request({
       method: 'PATCH',
       url: `/api/bookings/me/${state.bookingId}/check-out`,
+      body: { lat, lng },
+    }).then((resp) => {
+      expect(resp.status).to.eq(200);
+      expect(resp.body.status).to.eq('IN_PROGRESS');
+    });
+    apiLogout();
+
+    apiLogin(companionUser);
+    cy.request({
+      method: 'POST',
+      url: `/api/companions/me/bookings/${state.bookingId}/checkout`,
+      body: { lat: String(lat), lng: String(lng) },
     }).then((resp) => {
       expect(resp.status).to.eq(200);
       expect(resp.body.status).to.eq('COMPLETED');
     });
+    apiLogout();
 
+    apiLogin(customer);
     cy.request('/api/wallet/me').then((resp) => {
       const expectedBalance = DEPOSIT_AMOUNT - EXPECTED_HOLD;
       expect(Number(resp.body.balance)).to.eq(
@@ -303,6 +330,8 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
       expect(resp.status).to.eq(200);
       expect(resp.body.status).to.eq('PENDING');
       expect(Number(resp.body.amount)).to.eq(EXPECTED_HOLD);
+      expect(Number(resp.body.commissionAmount)).to.eq(30000);
+      expect(Number(resp.body.netAmount)).to.eq(170000);
       expect(resp.body.bankName).to.eq('Vietcombank');
       state.withdrawalId = resp.body.id;
     });
@@ -320,6 +349,19 @@ describe('Dòng tiền E2E: nạp ví, giữ tiền, thanh toán, thu nhập com
       expect(wd.status).to.eq('PENDING');
     });
 
+    apiLogout();
+  });
+
+  it('6b. Rút dưới 10.000 ₫ → 400', () => {
+    apiLogin(companionUser);
+    cy.request({
+      method: 'POST',
+      url: '/api/companions/me/withdrawals',
+      body: { amount: '5000' },
+      failOnStatusCode: false,
+    }).then((resp) => {
+      expect(resp.status).to.eq(400);
+    });
     apiLogout();
   });
 

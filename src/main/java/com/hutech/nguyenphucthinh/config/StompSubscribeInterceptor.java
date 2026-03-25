@@ -35,14 +35,16 @@ public class StompSubscribeInterceptor implements ChannelInterceptor {
         if (userId == null) {
             throw new IllegalStateException("Chưa đăng nhập");
         }
+        String role = attrs != null ? (String) attrs.get("role") : null;
+        boolean isAdmin = "ADMIN".equals(role);
         if (dest != null && dest.startsWith("/topic/chat.booking.")) {
             long bookingId = Long.parseLong(dest.substring("/topic/chat.booking.".length()));
-            if (!chatService.canAccessBookingChat(userId, bookingId)) {
+            if (!isAdmin && !chatService.canAccessBookingChat(userId, bookingId)) {
                 throw new IllegalStateException("Không có quyền xem cuộc trò chuyện này");
             }
         } else if (dest != null && dest.startsWith("/topic/location.booking.")) {
             long bookingId = Long.parseLong(dest.substring("/topic/location.booking.".length()));
-            if (!chatService.canAccessBookingChat(userId, bookingId)) {
+            if (!isAdmin && !chatService.canAccessBookingChat(userId, bookingId)) {
                 throw new IllegalStateException("Không có quyền theo dõi vị trí đơn này");
             }
         } else if (dest != null && dest.startsWith("/topic/notifications.user.")) {

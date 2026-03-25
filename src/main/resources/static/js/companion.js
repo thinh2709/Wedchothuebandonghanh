@@ -297,8 +297,10 @@ async function loadProfile() {
         document.getElementById('skills').value = profile.skills || '';
         document.getElementById('online-toggle').checked = !!(profile.onlineStatus ?? profile.online);
         const statusEl = document.getElementById('companion-status');
-        statusEl.className = `badge ${statusBadgeClass(profile.status)}`;
-        statusEl.textContent = profile.status || 'N/A';
+        if (statusEl) {
+            statusEl.className = `badge ${statusBadgeClass(profile.status)}`;
+            statusEl.textContent = profile.status || 'N/A';
+        }
     } catch (err) {
         showAlert(`Không thể tải hồ sơ: ${err.message || err}`, 'danger');
         document.getElementById('bio').value = '';
@@ -308,8 +310,10 @@ async function loadProfile() {
         const rv = document.getElementById('rental-venues');
         if (rv) rv.value = '';
         const statusEl = document.getElementById('companion-status');
-        statusEl.className = 'badge text-bg-secondary';
-        statusEl.textContent = 'N/A';
+        if (statusEl) {
+            statusEl.className = 'badge text-bg-secondary';
+            statusEl.textContent = 'N/A';
+        }
     }
 }
 
@@ -417,27 +421,55 @@ async function updateBookingStatus(bookingId, status) {
 
 async function checkInBooking(bookingId) {
     const loc = await getCurrentLocation();
-    await sendJson(`/api/companions/me/bookings/${bookingId}/checkin`, 'POST', {
-        lat: loc.lat,
-        lng: loc.lng
-    });
-    await loadBookings();
-    await loadBookingWorkflow();
-    startCompanionDashboardLiveShare(bookingId);
-    showAlert(`Đã check-in booking #${bookingId}.`);
+    if (loc.lat == null || loc.lng == null) {
+        showAlert('Không lấy được GPS. Bật định vị và dùng HTTPS hoặc localhost.', 'warning');
+        return;
+    }
+    try {
+        const booking = await sendJson(`/api/companions/me/bookings/${bookingId}/checkin`, 'POST', {
+            lat: loc.lat,
+            lng: loc.lng
+        });
+        await loadBookings();
+        await loadBookingWorkflow();
+        if (booking.status === 'IN_PROGRESS') {
+            startCompanionDashboardLiveShare(bookingId);
+            showAlert(`Đã check-in booking #${bookingId}. Phiên đã bắt đầu.`);
+        } else {
+            showAlert(
+                'Đã gửi vị trí check-in. Đơn chỉ chuyển sang đang diễn ra khi khách check-in GPS và hai bên ở gần nhau.',
+                'info'
+            );
+        }
+    } catch (err) {
+        showAlert(err.message || 'Check-in thất bại', 'danger');
+    }
 }
 
 async function checkOutBooking(bookingId) {
     const loc = await getCurrentLocation();
-    await sendJson(`/api/companions/me/bookings/${bookingId}/checkout`, 'POST', {
+    if (loc.lat == null || loc.lng == null) {
+        showAlert('Không lấy được GPS. Bật định vị và dùng HTTPS hoặc localhost.', 'warning');
+        return;
+    }
+    const booking = await sendJson(`/api/companions/me/bookings/${bookingId}/checkout`, 'POST', {
         lat: loc.lat,
         lng: loc.lng
     });
-    stopCompanionDashboardLiveShare(bookingId);
+    if (booking.status === 'COMPLETED') {
+        stopCompanionDashboardLiveShare(bookingId);
+    }
     await loadBookings();
     await loadBookingWorkflow();
     await loadIncomeStats();
-    showAlert(`Đã check-out booking #${bookingId}.`);
+    if (booking.status === 'COMPLETED') {
+        showAlert(`Đã check-out booking #${bookingId}. Đơn đã hoàn tất.`);
+    } else {
+        showAlert(
+            'Đã gửi vị trí check-out GPS. Đơn chỉ hoàn tất khi cả hai bên đã check-out và ở gần nhau như lúc check-in.',
+            'info'
+        );
+    }
 }
 
 async function sendSos(bookingId) {
@@ -520,18 +552,27 @@ function openSosModal(booking) {
     modal.show();
 }
 
-async function rateUser(bookingId) {
-    const rating = prompt('Đánh giá user (1-5):');
-    if (!rating) {
-        return;
+async function acceptBookingExtension(bookingId) {
+    try {
+        await sendJson(`/api/companions/me/bookings/${bookingId}/extension/accept`, 'POST', {});
+        await loadBookings();
+        await loadBookingWorkflow();
+        await loadIncomeStats();
+        showAlert(`Đã chấp nhận gia hạn cho booking #${bookingId}.`);
+    } catch (err) {
+        showAlert(err.message || 'Không thể chấp nhận gia hạn', 'danger');
     }
-    const review = prompt('Nhận xét ngắn về user:') || '';
-    await sendJson(`/api/companions/me/bookings/${bookingId}/rate-user`, 'POST', {
-        rating,
-        review
-    });
-    await loadBookings();
-    showAlert(`Đã đánh giá user cho booking #${bookingId}.`);
+}
+
+async function rejectBookingExtension(bookingId) {
+    try {
+        await sendJson(`/api/companions/me/bookings/${bookingId}/extension/reject`, 'POST', {});
+        await loadBookings();
+        await loadBookingWorkflow();
+        showAlert(`Đã từ chối yêu cầu gia hạn cho booking #${bookingId}.`);
+    } catch (err) {
+        showAlert(err.message || 'Không thể từ chối', 'danger');
+    }
 }
 
 async function loadBookings() {
@@ -548,20 +589,24 @@ async function loadBookings() {
         const canCheckIn = item.status === 'ACCEPTED';
         const canCheckOut = item.status === 'IN_PROGRESS';
         const canSos = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS';
-        const canRateUser = item.status === 'COMPLETED' && !item.companionRatingForUser;
         const canChat = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS' || item.status === 'COMPLETED';
+        const hasPendingExt = item.pendingExtensionMinutes != null;
+        const extLine = hasPendingExt
+            ? `<div class="small text-warning mb-1">Khách xin gia hạn +${item.pendingExtensionMinutes} phút</div>`
+            : '';
         tr.innerHTML = `
             <td>${item.id}</td>
             <td>${escapeHtml(item.customer?.fullName || item.customer?.username || '')}</td>
             <td>${escapeHtml(fmtDateTime(item.bookingTime))}</td>
-            <td>${item.duration} phút</td>
+            <td>${item.duration} phút${extLine}</td>
             <td><span class="badge text-bg-secondary">${escapeHtml(item.status)}</span></td>
             <td class="text-end">
                 ${canProcess ? `<button class="btn btn-sm btn-success me-2" data-action="accept">Nhận</button>
                 <button class="btn btn-sm btn-danger" data-action="reject">Từ chối</button>` : ''}
+                ${hasPendingExt ? `<button class="btn btn-sm btn-success me-1" data-action="ext-accept">Chấp nhận gia hạn</button>
+                <button class="btn btn-sm btn-outline-secondary me-2" data-action="ext-reject">Từ chối gia hạn</button>` : ''}
                 ${canCheckIn ? `<button class="btn btn-sm btn-outline-primary me-2" data-action="checkin">Check-in</button>` : ''}
                 ${canCheckOut ? `<button class="btn btn-sm btn-outline-success me-2" data-action="checkout">Check-out</button>` : ''}
-                ${canRateUser ? `<button class="btn btn-sm btn-outline-secondary me-2" data-action="rate">Rate User</button>` : ''}
                 ${canChat ? `<a class="btn btn-sm btn-outline-dark me-2" href="/user/chat.html?bookingId=${item.id}">Chat/Call</a>` : ''}
                 ${canSos ? `<button class="btn btn-sm btn-danger" data-action="sos"><i class="bi bi-exclamation-octagon me-1"></i>SOS</button>` : ''}
             </td>`;
@@ -569,14 +614,15 @@ async function loadBookings() {
             tr.querySelector('[data-action="accept"]').addEventListener('click', () => updateBookingStatus(item.id, 'ACCEPTED'));
             tr.querySelector('[data-action="reject"]').addEventListener('click', () => updateBookingStatus(item.id, 'REJECTED'));
         }
+        if (hasPendingExt) {
+            tr.querySelector('[data-action="ext-accept"]')?.addEventListener('click', () => acceptBookingExtension(item.id));
+            tr.querySelector('[data-action="ext-reject"]')?.addEventListener('click', () => rejectBookingExtension(item.id));
+        }
         if (canCheckIn) {
             tr.querySelector('[data-action="checkin"]').addEventListener('click', () => checkInBooking(item.id));
         }
         if (canCheckOut) {
             tr.querySelector('[data-action="checkout"]').addEventListener('click', () => checkOutBooking(item.id));
-        }
-        if (canRateUser) {
-            tr.querySelector('[data-action="rate"]').addEventListener('click', () => rateUser(item.id));
         }
         tr.querySelector('[data-action="sos"]')?.addEventListener('click', () => openSosModal(item));
         rows.appendChild(tr);
@@ -584,12 +630,17 @@ async function loadBookings() {
     syncCompanionDashboardLiveShares(bookings);
 }
 
+function setTextIfEl(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+
 async function loadBookingWorkflow() {
     const wf = await getJson('/api/companions/me/bookings/workflow');
-    document.getElementById('wf-pending').textContent = (wf.pending || []).length;
-    document.getElementById('wf-upcoming').textContent = (wf.upcoming || []).length;
-    document.getElementById('wf-running').textContent = (wf.running || []).length;
-    document.getElementById('wf-done').textContent = (wf.done || []).length;
+    setTextIfEl('wf-pending', String((wf.pending || []).length));
+    setTextIfEl('wf-upcoming', String((wf.upcoming || []).length));
+    setTextIfEl('wf-running', String((wf.running || []).length));
+    setTextIfEl('wf-done', String((wf.done || []).length));
 }
 
 async function answerConsultation(id, answer) {
@@ -638,12 +689,15 @@ async function loadConsultations() {
 }
 
 async function loadIncomeStats() {
+    if (!document.getElementById('stat-income')) {
+        return;
+    }
     const stats = await getJson('/api/companions/me/income-stats');
-    document.getElementById('stat-income').textContent = Number(stats.totalIncome || 0).toLocaleString('vi-VN');
-    document.getElementById('stat-available').textContent = Number(stats.availableBalance || 0).toLocaleString('vi-VN');
-    document.getElementById('stat-hold').textContent = Number(stats.holdAmount || 0).toLocaleString('vi-VN');
-    document.getElementById('stat-accepted').textContent = stats.acceptedBookings ?? 0;
-    document.getElementById('stat-completed').textContent = stats.completedBookings ?? 0;
+    setTextIfEl('stat-income', Number(stats.totalIncome || 0).toLocaleString('vi-VN'));
+    setTextIfEl('stat-available', Number(stats.availableBalance || 0).toLocaleString('vi-VN'));
+    setTextIfEl('stat-hold', Number(stats.holdAmount || 0).toLocaleString('vi-VN'));
+    setTextIfEl('stat-accepted', String(stats.acceptedBookings ?? 0));
+    setTextIfEl('stat-completed', String(stats.completedBookings ?? 0));
 }
 
 async function loadServicePrices() {
@@ -687,14 +741,20 @@ async function loadWithdrawals() {
     const data = await getJson('/api/companions/me/withdrawals');
     rows.innerHTML = '';
     if (!data.length) {
-        rows.innerHTML = '<tr><td colspan="4" class="text-muted">Chưa có lệnh rút tiền.</td></tr>';
+        rows.innerHTML = '<tr><td colspan="6" class="text-muted">Chưa có lệnh rút tiền.</td></tr>';
         return;
     }
     data.forEach(item => {
         const tr = document.createElement('tr');
+        const comm = item.commissionAmount != null ? Number(item.commissionAmount) : null;
+        const net = item.netAmount != null ? Number(item.netAmount) : null;
+        const commStr = comm != null && !Number.isNaN(comm) ? comm.toLocaleString('vi-VN') : '—';
+        const netStr = net != null && !Number.isNaN(net) ? net.toLocaleString('vi-VN') : '—';
         tr.innerHTML = `
             <td>${escapeHtml(fmtDateTime(item.createdAt))}</td>
             <td>${Number(item.amount || 0).toLocaleString('vi-VN')}</td>
+            <td class="text-warning">${commStr}</td>
+            <td class="text-success fw-semibold">${netStr}</td>
             <td>${escapeHtml(item.bankName || '')}</td>
             <td><span class="badge text-bg-secondary">${escapeHtml(item.status || '')}</span></td>`;
         rows.appendChild(tr);

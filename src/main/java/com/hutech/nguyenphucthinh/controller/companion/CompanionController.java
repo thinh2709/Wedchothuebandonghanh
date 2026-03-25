@@ -7,6 +7,7 @@ import com.hutech.nguyenphucthinh.model.Consultation;
 import com.hutech.nguyenphucthinh.model.ServicePrice;
 import com.hutech.nguyenphucthinh.model.Withdrawal;
 import com.hutech.nguyenphucthinh.service.companion.CompanionService;
+import com.hutech.nguyenphucthinh.service.user.BookingService;
 import com.hutech.nguyenphucthinh.util.RequestBodyParseUtil;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,8 @@ public class CompanionController {
 
     @Autowired
     private CompanionService companionService;
+    @Autowired
+    private BookingService bookingService;
 
     @GetMapping
     public List<Companion> getAllCompanions() {
@@ -35,12 +38,11 @@ public class CompanionController {
             @RequestParam(required = false) String serviceType,
             @RequestParam(required = false) String area,
             @RequestParam(required = false) String gender,
-            @RequestParam(required = false) String gameRank,
             @RequestParam(required = false) Boolean online,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice
     ) {
-        return companionService.searchCompanions(serviceType, area, gender, gameRank, online, minPrice, maxPrice);
+        return companionService.searchCompanions(serviceType, area, gender, online, minPrice, maxPrice);
     }
 
     @GetMapping("/{id}")
@@ -71,7 +73,6 @@ public class CompanionController {
                 request.getOrDefault("area", ""),
                 request.getOrDefault("rentalVenues", ""),
                 request.getOrDefault("gender", ""),
-                request.getOrDefault("gameRank", ""),
                 Boolean.parseBoolean(request.getOrDefault("onlineStatus", "false")),
                 request.getOrDefault("avatarUrl", ""),
                 request.getOrDefault("introVideoUrl", "")
@@ -191,6 +192,24 @@ public class CompanionController {
             throw new RuntimeException("Please login first");
         }
         return companionService.getBookingWorkflow(userId);
+    }
+
+    @PostMapping("/me/bookings/{bookingId}/extension/accept")
+    public Booking acceptBookingExtension(@PathVariable Long bookingId, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return bookingService.acceptBookingExtension(userId, bookingId);
+    }
+
+    @PostMapping("/me/bookings/{bookingId}/extension/reject")
+    public Booking rejectBookingExtension(@PathVariable Long bookingId, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return bookingService.rejectBookingExtension(userId, bookingId);
     }
 
     @PostMapping("/me/bookings/{bookingId}/checkin")

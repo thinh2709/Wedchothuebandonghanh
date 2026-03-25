@@ -180,6 +180,16 @@ function renderTopNav(auth) {
     }
 }
 
+/** Nhãn giá VND/giờ từ servicePriceMin/Max (API) hoặc fallback pricePerHour. */
+function formatCompanionHourlyPriceRange(companion) {
+    const min = companion.servicePriceMin != null ? Number(companion.servicePriceMin) : Number(companion.pricePerHour || 0);
+    const max = companion.servicePriceMax != null ? Number(companion.servicePriceMax) : Number(companion.pricePerHour || 0);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return "— VND/h";
+    if (min <= 0 && max <= 0) return "— VND/h";
+    if (min === max) return `${min.toLocaleString("vi-VN")} VND/h`;
+    return `${min.toLocaleString("vi-VN")} – ${max.toLocaleString("vi-VN")} VND/h`;
+}
+
 function companionCard(companion) {
     const name = companion.user?.fullName || companion.user?.username || "Companion";
     const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chưa có đánh giá";
@@ -206,7 +216,7 @@ function companionCard(companion) {
           <div class="d-flex flex-wrap gap-2 mb-3">
             <span class="badge bg-light text-dark border"><i class="bi bi-grid me-1"></i>${escapeHtml(companion.serviceType || "-")}</span>
             <span class="badge bg-light text-dark border"><i class="bi bi-geo-alt me-1"></i>${escapeHtml(companion.area || "-")}</span>
-            <span class="badge bg-light text-dark border"><i class="bi bi-cash me-1"></i>${Number(companion.pricePerHour || 0).toLocaleString("vi-VN")} VND/h</span>
+            <span class="badge bg-light text-dark border"><i class="bi bi-cash me-1"></i>${formatCompanionHourlyPriceRange(companion)}</span>
           </div>
           <div class="d-grid gap-2">
             <a class="btn btn-outline-primary btn-sm" href="/user/profile.html?id=${companion.id}"><i class="bi bi-person-lines-fill me-1"></i>Xem profile</a>
@@ -249,7 +259,7 @@ async function initSearchPage() {
         e.preventDefault();
         const q = (keyword.value || "").trim().toLowerCase();
         const params = new URLSearchParams();
-        ["serviceType", "area", "gender", "gameRank", "minPrice", "maxPrice", "online"].forEach((id) => {
+        ["serviceType", "area", "gender", "minPrice", "maxPrice", "online"].forEach((id) => {
             const value = document.getElementById(id)?.value;
             if (value !== undefined && value !== null && value !== "") params.set(id, value);
         });
@@ -301,7 +311,8 @@ async function initProfilePage(auth) {
               <p><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
               <p><strong>Ngoại hình:</strong> ${escapeHtml(companion.appearance || "Chưa có")}</p>
               <p><strong>Thời gian rảnh:</strong> ${escapeHtml(companion.availability || "Chưa có")}</p>
-              <p><strong>Dịch vụ:</strong> ${escapeHtml(companion.serviceType || "-")} | <strong>Rank:</strong> ${escapeHtml(companion.gameRank || "-")}</p>
+              <p><strong>Dịch vụ:</strong> ${escapeHtml(companion.serviceType || "-")}</p>
+              <p><strong>Giá (theo dịch vụ):</strong> ${escapeHtml(formatCompanionHourlyPriceRange(companion))}</p>
               <p><strong>Khu vực:</strong> ${escapeHtml(companion.area || "-")} | <strong>Giới tính:</strong> ${escapeHtml(companion.gender || "-")}</p>
               ${
                   parseRentalVenuesLines(companion.rentalVenues).length
@@ -583,7 +594,13 @@ async function initAppointmentsPage(auth) {
     const box = document.getElementById("appointment-list");
     const res = await apiFetch("/api/bookings/me", { headers: {} });
     const bookings = res.ok ? await res.json() : [];
-    box.innerHTML = bookings.length ? bookings.map((b) => `
+    box.innerHTML = bookings.length ? bookings.map((b) => {
+        const extMax = 120;
+        const extApproved = Number(b.extensionMinutesApproved || 0);
+        const extRemaining = extMax - extApproved;
+        const hasPendingExt = b.pendingExtensionMinutes != null;
+        const canRequestExt = (b.status === "ACCEPTED" || b.status === "IN_PROGRESS") && !hasPendingExt && extRemaining >= 30;
+        return `
       <div class="card user-card mb-3"><div class="card-body">
         <h5>${escapeHtml(b.companion?.user?.fullName || b.companion?.user?.username || "Companion")}</h5>
         <div class="row">
@@ -595,28 +612,79 @@ async function initAppointmentsPage(auth) {
           <div class="col-md-6"><strong>Trạng thái:</strong> ${escapeHtml(b.status || "-")}</div>
           <div class="col-md-6"><strong>Dịch vụ:</strong> ${escapeHtml(b.serviceName || "-")}</div>
           <div class="col-md-6"><strong>Giá dịch vụ:</strong> ${Number(b.servicePricePerHour || 0).toLocaleString("vi-VN")} VND/giờ</div>
+          <div class="col-12 small text-muted mt-1"><strong>Gia hạn (tối đa ${extMax} phút/đơn):</strong> đã dùng ${extApproved} phút — còn ${Math.max(0, extRemaining)} phút.</div>
+          ${hasPendingExt ? `<div class="col-12 small text-warning"><strong>Chờ companion duyệt gia hạn:</strong> +${Number(b.pendingExtensionMinutes)} phút</div>` : ""}
           <div class="col-12 mt-2"><strong>Ghi chú:</strong> ${escapeHtml(b.note || "-")}</div>
         </div>
-        <div class="d-flex gap-2 mt-3">
+        <div class="d-flex flex-wrap gap-2 mt-3">
           ${b.status === "PENDING" || b.status === "ACCEPTED" ? `<button class="btn btn-outline-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel">Hủy đơn</button>` : ""}
           ${b.status === "ACCEPTED" ? `<button class="btn btn-outline-primary btn-sm booking-action" data-id="${b.id}" data-action="check-in">Check-in</button>` : ""}
           ${b.status === "IN_PROGRESS" ? `<button class="btn btn-success btn-sm booking-action" data-id="${b.id}" data-action="check-out">Check-out</button>` : ""}
-          ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<button class="btn btn-outline-secondary btn-sm booking-action" data-id="${b.id}" data-action="extend">Gia hạn 30p</button>` : ""}
+          ${canRequestExt ? `<button class="btn btn-outline-secondary btn-sm booking-action" data-id="${b.id}" data-action="extend">Xin gia hạn +30 phút</button>` : ""}
+          ${hasPendingExt ? `<button class="btn btn-outline-warning btn-sm booking-action" data-id="${b.id}" data-action="extension-cancel">Hủy yêu cầu gia hạn</button>` : ""}
           ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<a class="btn btn-outline-dark btn-sm" href="/user/chat.html?bookingId=${b.id}">Chat/Call</a>` : ""}
           ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<a class="btn btn-danger btn-sm" href="/user/report.html?reportedUserId=${b.companion?.user?.id || ""}&bookingId=${b.id}&emergency=1"><i class="bi bi-exclamation-octagon me-1"></i>SOS</a>` : ""}
         </div>
-      </div></div>`).join("") : `<div class="empty-state">Bạn chưa có lịch hẹn nào.</div>`;
+      </div></div>`;
+    }).join("") : `<div class="empty-state">Bạn chưa có lịch hẹn nào.</div>`;
 
     box.querySelectorAll(".booking-action").forEach((btn) => {
         btn.addEventListener("click", async () => {
             const id = btn.getAttribute("data-id");
             const action = btn.getAttribute("data-action");
-            const res = action === "extend"
-                ? await apiFetch(`/api/bookings/me/${id}/extend`, { method: "PATCH", body: JSON.stringify({ extraMinutes: 30 }) })
-                : await apiFetch(`/api/bookings/me/${id}/${action}`, { method: "PATCH", headers: {} });
+            let res;
+            if (action === "check-in") {
+                try {
+                    const pos = await getReporterGps();
+                    if (pos.lat == null || pos.lng == null) {
+                        alert(
+                            "Không lấy được GPS. Bật định vị, cho phép trình duyệt; cần HTTPS hoặc localhost (xem hướng dẫn trang Tố cáo)."
+                        );
+                        return;
+                    }
+                    res = await apiFetch(`/api/bookings/me/${id}/check-in`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng }),
+                    });
+                } catch (e) {
+                    alert(e?.message || "Lỗi khi lấy GPS.");
+                    return;
+                }
+            } else if (action === "check-out") {
+                try {
+                    const pos = await getReporterGps();
+                    if (pos.lat == null || pos.lng == null) {
+                        alert(
+                            "Không lấy được GPS. Bật định vị, cho phép trình duyệt; cần HTTPS hoặc localhost (xem hướng dẫn trang Tố cáo)."
+                        );
+                        return;
+                    }
+                    res = await apiFetch(`/api/bookings/me/${id}/check-out`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng }),
+                    });
+                } catch (e) {
+                    alert(e?.message || "Lỗi khi lấy GPS.");
+                    return;
+                }
+            } else if (action === "extend") {
+                res = await apiFetch(`/api/bookings/me/${id}/extension-request`, {
+                    method: "POST",
+                    body: JSON.stringify({ extraMinutes: 30 }),
+                });
+            } else if (action === "extension-cancel") {
+                res = await apiFetch(`/api/bookings/me/${id}/extension-request/cancel`, { method: "POST", headers: {} });
+            } else {
+                res = await apiFetch(`/api/bookings/me/${id}/${action}`, { method: "PATCH", headers: {} });
+            }
             if (!res.ok) {
                 const text = await res.text();
-                alert(text || "Thao tác thất bại");
+                let msg = text || "Thao tác thất bại";
+                try {
+                    const j = JSON.parse(text);
+                    if (j.message) msg = j.message;
+                } catch (_) {}
+                alert(msg);
                 return;
             }
             await initAppointmentsPage(auth);

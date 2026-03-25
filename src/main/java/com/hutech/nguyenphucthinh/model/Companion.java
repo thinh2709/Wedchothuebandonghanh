@@ -45,9 +45,6 @@ public class Companion {
     @Column(length = 20)
     private String gender;
 
-    @Column(length = 50)
-    private String gameRank;
-
     @Column(name = "online", nullable = false)
     private Boolean onlineStatus = false;
 
@@ -92,6 +89,13 @@ public class Companion {
 
     @Transient
     private Long reviewCount;
+
+    /** Min/max giá VND/giờ theo bảng dịch vụ (service_prices); gắn khi trả API. */
+    @Transient
+    private BigDecimal servicePriceMin;
+
+    @Transient
+    private BigDecimal servicePriceMax;
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;

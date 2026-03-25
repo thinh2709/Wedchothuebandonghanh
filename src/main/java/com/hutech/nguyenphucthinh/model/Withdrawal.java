@@ -21,8 +21,17 @@ public class Withdrawal {
     @JoinColumn(name = "companion_id", nullable = false)
     private Companion companion;
 
+    /** Số tiền trừ từ thu nhập companion (tổng yêu cầu rút, đã khóa). */
     @Column(nullable = false)
     private BigDecimal amount;
+
+    /** Hoa hồng nền tảng trừ trên lệnh rút (theo tỷ lệ admin). */
+    @Column
+    private BigDecimal commissionAmount;
+
+    /** Số tiền thực chuyển khoản cho companion (amount - commission). */
+    @Column
+    private BigDecimal netAmount;
 
     @Column(nullable = false, length = 100)
     private String bankName;

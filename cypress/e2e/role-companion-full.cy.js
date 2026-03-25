@@ -101,7 +101,7 @@ describe('COMPANION full flow: UI to API', () => {
     cy.wait('@saveBankApi').its('response.statusCode').should('eq', 200);
     cy.get('#alert-box').invoke('text').should('match', /ngân hàng|lưu/i);
 
-    cy.get('#withdraw-amount').clear().type('1');
+    cy.get('#withdraw-amount').clear().type('10000');
     cy.get('#withdraw-form').submit();
     cy.wait('@withdrawApi').then(({ response }) => {
       expect([200, 400]).to.include(response.statusCode);

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin — Theo dõi đơn & GPS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="/css/admin.css">
+    <style>
+        #admin-tracking-map { height: min(52vh, 480px); min-height: 320px; border-radius: 12px; z-index: 1; }
+        .tracking-legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <div class="sidebar-brand">Quản trị Companion</div>
+        <nav class="nav flex-column gap-1">
+            <a class="nav-link" href="/admin/dashboard.html"><i class="bi bi-grid-1x2-fill"></i> Bảng điều khiển</a>
+            <a class="nav-link" href="/admin/users.html"><i class="bi bi-people-fill"></i> Quản lý người dùng</a>
+            <a class="nav-link" href="/admin/moderation.html"><i class="bi bi-shield-check"></i> Kiểm duyệt nội dung</a>
+            <a class="nav-link" href="/admin/transactions.html"><i class="bi bi-cash-stack"></i> Giao dịch & dòng tiền</a>
+            <a class="nav-link active" href="/admin/tracking.html"><i class="bi bi-geo-alt-fill"></i> Theo dõi đơn & GPS</a>
+            <a class="nav-link" href="/admin/disputes.html"><i class="bi bi-flag-fill"></i> Xử lý tranh chấp</a>
+            <a class="nav-link" href="/admin/notifications.html"><i class="bi bi-bell-fill"></i> Thông báo</a>
+        </nav>
+    </aside>
+
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <div>
+                <h1 class="h4 mb-0 fw-bold">Theo dõi đơn & GPS</h1>
+                <p class="text-muted small mb-0">Đơn ACCEPTED / IN_PROGRESS — check-in, vị trí live (WebSocket), lịch sử di chuyển trên bản đồ</p>
+            </div>
+            <button class="btn btn-outline-light btn-sm" id="reload-tracking-btn" type="button" data-cy="reload-tracking-btn">
+                <i class="bi bi-arrow-clockwise me-1"></i>Tải lại
+            </button>
+        </header>
+
+        <main class="admin-content">
+            <div id="admin-alert" class="mb-3" data-cy="admin-alert"></div>
+
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white fw-semibold">Đơn đang theo dõi</div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 small">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Trạng thái</th>
+                                    <th>Khách</th>
+                                    <th>Companion</th>
+                                    <th>Giờ hẹn</th>
+                                    <th>Nơi thuê</th>
+                                    <th>Live</th>
+                                </tr>
+                                </thead>
+                                <tbody id="admin-tracking-body" data-cy="admin-tracking-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">Chọn một dòng để xem bản đồ. Vị trí live cập nhật qua cùng kênh WebSocket với khách/companion (khoảng ~25s mỗi lần gửi GPS).</p>
+                </div>
+                <div class="col-lg-7">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span class="fw-semibold">Bản đồ — đơn <span id="admin-tracking-selected-id" class="text-primary">—</span></span>
+                            <div class="tracking-legend small text-muted">
+                                <span class="me-2"><span style="background:#2563eb"></span>Khách</span>
+                                <span class="me-2"><span style="background:#16a34a"></span>Companion</span>
+                                <span class="me-2"><span style="background:#7c3aed"></span>Điểm hẹn</span>
+                                <span class="me-2"><span style="background:#dc2626"></span>Live</span>
+                                <span><span style="background:#f97316"></span>Đường đi</span>
+                            </div>
+                        </div>
+                        <div class="card-body pt-0">
+                            <div id="admin-tracking-map" data-cy="admin-tracking-map"></div>
+                            <div id="admin-tracking-detail" class="mt-3 small text-body-secondary border-top pt-3" data-cy="admin-tracking-detail">
+                                Chọn đơn ở bảng bên trái.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="/js/realtime-stomp.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

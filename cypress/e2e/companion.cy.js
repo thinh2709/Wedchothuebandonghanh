@@ -111,7 +111,7 @@ describe('Companion Flow', () => {
     loginUser();
     cy.visit('/companion/dashboard.html');
 
-    cy.get('#withdraw-amount').type('1');
+    cy.get('#withdraw-amount').type('10000');
     cy.get('#bank-name').type('VCB');
     cy.get('#bank-account-number').type('123456789');
     cy.get('#account-holder-name').type('E2E TEST');

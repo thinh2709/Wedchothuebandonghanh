@@ -3,11 +3,12 @@ package com.hutech.nguyenphucthinh.controller.user;
 import com.hutech.nguyenphucthinh.model.Booking;
 import com.hutech.nguyenphucthinh.service.user.BookingService;
 import com.hutech.nguyenphucthinh.util.RequestBodyParseUtil;
+
+import java.util.Map;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -51,26 +52,44 @@ public class BookingController {
     }
 
     @PatchMapping("/me/{bookingId}/check-in")
-    public Booking checkIn(@PathVariable Long bookingId, HttpSession session) {
+    public Booking checkIn(
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         if (userId == null) throw new RuntimeException("Please login first");
-        return bookingService.checkIn(userId, bookingId);
+        Double lat = RequestBodyParseUtil.readDouble(body, "lat");
+        Double lng = RequestBodyParseUtil.readDouble(body, "lng");
+        return bookingService.checkInCustomer(userId, bookingId, lat, lng);
     }
 
     @PatchMapping("/me/{bookingId}/check-out")
-    public Booking checkOut(@PathVariable Long bookingId, HttpSession session) {
+    public Booking checkOut(
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         if (userId == null) throw new RuntimeException("Please login first");
-        return bookingService.checkOut(userId, bookingId);
+        Double lat = RequestBodyParseUtil.readDouble(body, "lat");
+        Double lng = RequestBodyParseUtil.readDouble(body, "lng");
+        return bookingService.checkOutCustomer(userId, bookingId, lat, lng);
     }
 
-    @PatchMapping("/me/{bookingId}/extend")
-    public Booking extendBooking(@PathVariable Long bookingId, @RequestBody Map<String, Object> request, HttpSession session) {
+    /** Khách xin gia hạn — companion duyệt qua API riêng mới thu cọc thêm. */
+    @PostMapping("/me/{bookingId}/extension-request")
+    public Booking requestExtension(@PathVariable Long bookingId, @RequestBody Map<String, Object> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");
         if (userId == null) throw new RuntimeException("Please login first");
         Number extraMinutes = (Number) request.get("extraMinutes");
         if (extraMinutes == null) throw new RuntimeException("extraMinutes is required");
-        return bookingService.extendBooking(userId, bookingId, extraMinutes.intValue());
+        return bookingService.requestBookingExtension(userId, bookingId, extraMinutes.intValue());
+    }
+
+    @PostMapping("/me/{bookingId}/extension-request/cancel")
+    public Booking cancelExtensionRequest(@PathVariable Long bookingId, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+        return bookingService.cancelBookingExtensionRequest(userId, bookingId);
     }
 
     @GetMapping("/customer/{customerId}")

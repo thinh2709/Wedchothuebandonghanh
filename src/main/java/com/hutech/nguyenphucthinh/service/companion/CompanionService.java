@@ -6,7 +6,6 @@ import com.hutech.nguyenphucthinh.model.Consultation;
 import com.hutech.nguyenphucthinh.model.Companion;
 import com.hutech.nguyenphucthinh.model.ServicePrice;
 import com.hutech.nguyenphucthinh.model.User;
-import com.hutech.nguyenphucthinh.model.Transaction;
 import com.hutech.nguyenphucthinh.model.Withdrawal;
 import com.hutech.nguyenphucthinh.repository.BookingRepository;
 import com.hutech.nguyenphucthinh.repository.CompanionAvailabilityRepository;
@@ -17,6 +16,8 @@ import com.hutech.nguyenphucthinh.repository.ServicePriceRepository;
 import com.hutech.nguyenphucthinh.repository.TransactionRepository;
 import com.hutech.nguyenphucthinh.repository.UserRepository;
 import com.hutech.nguyenphucthinh.repository.WithdrawalRepository;
+import com.hutech.nguyenphucthinh.service.admin.AdminService;
+import com.hutech.nguyenphucthinh.service.user.BookingService;
 import com.hutech.nguyenphucthinh.service.user.NotificationService;
 import com.hutech.nguyenphucthinh.service.user.WalletService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +36,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class CompanionService {
+
+    private static final BigDecimal MIN_WITHDRAWAL_AMOUNT = new BigDecimal("10000");
     @Autowired
     private CompanionRepository companionRepository;
     @Autowired
@@ -56,6 +60,10 @@ public class CompanionService {
     private ServicePriceRepository servicePriceRepository;
     @Autowired
     private WithdrawalRepository withdrawalRepository;
+    @Autowired
+    private AdminService adminService;
+    @Autowired
+    private BookingService bookingService;
 
     public List<Companion> getAllCompanions() {
         List<Companion> companions = companionRepository.findByStatus(Companion.Status.APPROVED);
@@ -77,10 +85,25 @@ public class CompanionService {
         Double avg = reviewRepository.getAverageRatingByCompanionId(companion.getId());
         companion.setAverageRating(avg != null ? avg : 0.0);
         companion.setReviewCount(reviewRepository.getReviewCountByCompanionId(companion.getId()));
+        attachServicePriceRange(companion);
+    }
+
+    private void attachServicePriceRange(Companion companion) {
+        BigDecimal fallback = companion.getPricePerHour() != null ? companion.getPricePerHour() : BigDecimal.valueOf(200000);
+        List<ServicePrice> rows = servicePriceRepository.findByCompanionIdOrderByIdDesc(companion.getId());
+        if (rows == null || rows.isEmpty()) {
+            companion.setServicePriceMin(fallback);
+            companion.setServicePriceMax(fallback);
+            return;
+        }
+        BigDecimal min = rows.stream().map(ServicePrice::getPricePerHour).min(BigDecimal::compareTo).orElse(fallback);
+        BigDecimal max = rows.stream().map(ServicePrice::getPricePerHour).max(BigDecimal::compareTo).orElse(fallback);
+        companion.setServicePriceMin(min);
+        companion.setServicePriceMax(max);
     }
 
     public Companion registerCompanion(Long userId, String bio, String hobbies, String appearance, String availability,
-                                       String serviceType, String area, String rentalVenues, String gender, String gameRank,
+                                       String serviceType, String area, String rentalVenues, String gender,
                                        Boolean onlineStatus, String avatarUrl, String introVideoUrl) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
         if (user.getRole() != User.Role.COMPANION) {
@@ -101,7 +124,6 @@ public class CompanionService {
         companion.setArea(area);
         companion.setRentalVenues(rentalVenues);
         companion.setGender(gender);
-        companion.setGameRank(gameRank);
         companion.setOnlineStatus(Boolean.TRUE.equals(onlineStatus));
         companion.setAvatarUrl(avatarUrl);
         companion.setIntroVideoUrl(introVideoUrl);
@@ -140,9 +162,6 @@ public class CompanionService {
         if (request.containsKey("gender")) {
             companion.setGender(request.get("gender"));
         }
-        if (request.containsKey("gameRank")) {
-            companion.setGameRank(request.get("gameRank"));
-        }
         if (request.containsKey("onlineStatus")) {
             companion.setOnlineStatus(Boolean.parseBoolean(request.get("onlineStatus")));
         }
@@ -176,17 +195,28 @@ public class CompanionService {
         return companionRepository.save(companion);
     }
 
-    public List<Companion> searchCompanions(String serviceType, String area, String gender, String gameRank,
+    public List<Companion> searchCompanions(String serviceType, String area, String gender,
                                             Boolean online, BigDecimal minPrice, BigDecimal maxPrice) {
         return getAllCompanions().stream().filter(c -> {
             boolean ok = true;
             if (serviceType != null && !serviceType.isBlank()) ok = ok && serviceType.equalsIgnoreCase(c.getServiceType());
             if (area != null && !area.isBlank()) ok = ok && c.getArea() != null && c.getArea().toLowerCase().contains(area.toLowerCase());
             if (gender != null && !gender.isBlank()) ok = ok && gender.equalsIgnoreCase(c.getGender());
-            if (gameRank != null && !gameRank.isBlank()) ok = ok && c.getGameRank() != null && c.getGameRank().toLowerCase().contains(gameRank.toLowerCase());
             if (online != null) ok = ok && online.equals(c.getOnlineStatus());
-            if (minPrice != null) ok = ok && c.getPricePerHour() != null && c.getPricePerHour().compareTo(minPrice) >= 0;
-            if (maxPrice != null) ok = ok && c.getPricePerHour() != null && c.getPricePerHour().compareTo(maxPrice) <= 0;
+            BigDecimal cMin = c.getServicePriceMin();
+            BigDecimal cMax = c.getServicePriceMax();
+            if (cMin == null || cMax == null) {
+                BigDecimal p = c.getPricePerHour() != null ? c.getPricePerHour() : BigDecimal.valueOf(200000);
+                cMin = p;
+                cMax = p;
+            }
+            if (minPrice != null && maxPrice != null) {
+                ok = ok && cMax.compareTo(minPrice) >= 0 && cMin.compareTo(maxPrice) <= 0;
+            } else if (minPrice != null) {
+                ok = ok && cMax.compareTo(minPrice) >= 0;
+            } else if (maxPrice != null) {
+                ok = ok && cMin.compareTo(maxPrice) <= 0;
+            }
             return ok;
         }).toList();
     }
@@ -272,54 +302,11 @@ public class CompanionService {
     }
 
     public Booking checkIn(Long userId, Long bookingId, Double lat, Double lng) {
-        Companion companion = getCompanionByUserId(userId);
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
-        if (!booking.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
-        }
-        if (booking.getStatus() != Booking.Status.ACCEPTED) {
-            throw new RuntimeException("Đơn không ở trạng thái ACCEPTED");
-        }
-        booking.setCheckInLatitude(lat);
-        booking.setCheckInLongitude(lng);
-        booking.setStartedAt(LocalDateTime.now());
-        booking.setStatus(Booking.Status.IN_PROGRESS);
-        return bookingRepository.save(booking);
+        return bookingService.checkInCompanion(userId, bookingId, lat, lng);
     }
 
     public Booking checkOut(Long userId, Long bookingId, Double lat, Double lng) {
-        Companion companion = getCompanionByUserId(userId);
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
-        if (!booking.getCompanion().getId().equals(companion.getId())) {
-            throw new RuntimeException("Bạn không có quyền thực hiện thao tác này");
-        }
-        if (booking.getStatus() != Booking.Status.IN_PROGRESS) {
-            throw new RuntimeException("Đơn không ở trạng thái IN_PROGRESS");
-        }
-        booking.setCheckOutLatitude(lat);
-        booking.setCheckOutLongitude(lng);
-        booking.setCompletedAt(LocalDateTime.now());
-        booking.setLiveLatitude(null);
-        booking.setLiveLongitude(null);
-        booking.setLiveLocationAt(null);
-        booking.setLiveLocationRole(null);
-        booking.setStatus(Booking.Status.COMPLETED);
-
-        Transaction tx = new Transaction();
-        tx.setBooking(booking);
-        tx.setAmount(booking.getHoldAmount());
-        tx.setStatus(Transaction.Status.COMPLETED);
-        transactionRepository.save(tx);
-
-        walletService.chargeForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
-
-        notificationService.create(
-                booking.getCustomer().getId(),
-                "Booking hoàn tất",
-                "Đơn #" + booking.getId() + " đã kết thúc. Bạn có thể để lại đánh giá."
-        );
-
-        return bookingRepository.save(booking);
+        return bookingService.checkOutCompanion(userId, bookingId, lat, lng);
     }
 
     public Booking triggerSos(Long userId, Long bookingId, String note, Double lat, Double lng) {
@@ -387,6 +374,8 @@ public class CompanionService {
         stats.put("completedBookings", completedBookings);
         stats.put("acceptedBookings", acceptedBookings);
         stats.put("inProgressBookings", inProgressBookings);
+        stats.put("withdrawalMinAmount", MIN_WITHDRAWAL_AMOUNT);
+        stats.put("withdrawalCommissionRate", adminService.getCommissionRate());
         return stats;
     }
 
@@ -458,6 +447,9 @@ public class CompanionService {
         if (amount == null || amount.signum() <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền rút phải lớn hơn 0");
         }
+        if (amount.compareTo(MIN_WITHDRAWAL_AMOUNT) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền rút tối thiểu là 10.000 ₫");
+        }
         Companion companion = getCompanionByUserId(userId);
         if (companion.getPayoutBankName() == null || companion.getPayoutBankName().isBlank()
                 || companion.getPayoutBankAccountNumber() == null || companion.getPayoutBankAccountNumber().isBlank()
@@ -472,9 +464,26 @@ public class CompanionService {
         if (amount.compareTo(available) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số dư khả dụng không đủ");
         }
+        BigDecimal rate = adminService.getCommissionRate();
+        if (rate == null || rate.compareTo(BigDecimal.ZERO) < 0) {
+            rate = BigDecimal.ZERO;
+        }
+        if (rate.compareTo(BigDecimal.ONE) > 0) {
+            rate = BigDecimal.ONE;
+        }
+        BigDecimal commission = amount.multiply(rate).setScale(0, RoundingMode.HALF_UP);
+        if (commission.compareTo(amount) > 0) {
+            commission = amount;
+        }
+        BigDecimal net = amount.subtract(commission);
+        if (net.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số tiền sau hoa hồng phải lớn hơn 0 — tăng số tiền rút hoặc giảm tỷ lệ hoa hồng");
+        }
         Withdrawal withdrawal = new Withdrawal();
         withdrawal.setCompanion(companion);
         withdrawal.setAmount(amount);
+        withdrawal.setCommissionAmount(commission);
+        withdrawal.setNetAmount(net);
         withdrawal.setBankName(companion.getPayoutBankName());
         withdrawal.setBankAccountNumber(companion.getPayoutBankAccountNumber());
         withdrawal.setAccountHolderName(companion.getPayoutAccountHolderName());

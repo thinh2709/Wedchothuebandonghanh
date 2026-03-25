@@ -62,9 +62,27 @@ public class Booking {
 
     private Double checkInLongitude;
 
+    /** GPS lúc check-in của khách (chờ companion check-in gần mới vào IN_PROGRESS). */
+    private Double customerCheckInLatitude;
+
+    private Double customerCheckInLongitude;
+
+    private Double companionCheckInLatitude;
+
+    private Double companionCheckInLongitude;
+
     private Double checkOutLatitude;
 
     private Double checkOutLongitude;
+
+    /** GPS check-out khách — đơn COMPLETED khi companion cũng check-out và hai điểm trong bán kính cấu hình. */
+    private Double customerCheckOutLatitude;
+
+    private Double customerCheckOutLongitude;
+
+    private Double companionCheckOutLatitude;
+
+    private Double companionCheckOutLongitude;
 
     /** Vị trí chia sẻ realtime (đơn ACCEPTED / IN_PROGRESS), cập nhật định kỳ từ app. */
     private Double liveLatitude;
@@ -88,6 +106,14 @@ public class Booking {
     private String companionReviewForUser;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    /** Tổng số phút đã gia hạn được companion duyệt (tối đa theo cấu hình, vd 120). */
+    private Integer extensionMinutesApproved;
+
+    /** Khách xin gia hạn thêm bấy nhiêu phút — chờ companion duyệt mới thu cọc. */
+    private Integer pendingExtensionMinutes;
+
+    private LocalDateTime pendingExtensionRequestedAt;
 
     public enum Status {
         PENDING, ACCEPTED, REJECTED, IN_PROGRESS, COMPLETED, CANCELLED
