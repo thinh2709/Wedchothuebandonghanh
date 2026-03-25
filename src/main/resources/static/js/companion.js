@@ -452,23 +452,27 @@ async function checkOutBooking(bookingId) {
         showAlert('Không lấy được GPS. Bật định vị và dùng HTTPS hoặc localhost.', 'warning');
         return;
     }
-    const booking = await sendJson(`/api/companions/me/bookings/${bookingId}/checkout`, 'POST', {
-        lat: loc.lat,
-        lng: loc.lng
-    });
-    if (booking.status === 'COMPLETED') {
-        stopCompanionDashboardLiveShare(bookingId);
-    }
-    await loadBookings();
-    await loadBookingWorkflow();
-    await loadIncomeStats();
-    if (booking.status === 'COMPLETED') {
-        showAlert(`Đã check-out booking #${bookingId}. Đơn đã hoàn tất.`);
-    } else {
-        showAlert(
-            'Đã gửi vị trí check-out GPS. Đơn chỉ hoàn tất khi cả hai bên đã check-out và ở gần nhau như lúc check-in.',
-            'info'
-        );
+    try {
+        const booking = await sendJson(`/api/companions/me/bookings/${bookingId}/checkout`, 'POST', {
+            lat: loc.lat,
+            lng: loc.lng
+        });
+        if (booking?.status === 'COMPLETED') {
+            stopCompanionDashboardLiveShare(bookingId);
+        }
+        await loadBookings();
+        await loadBookingWorkflow();
+        await loadIncomeStats();
+        if (booking?.status === 'COMPLETED') {
+            showAlert(`Đã check-out booking #${bookingId}. Đơn đã hoàn tất.`);
+        } else {
+            showAlert(
+                'Đã gửi vị trí check-out GPS. Đơn chỉ hoàn tất khi cả hai bên đã check-out và ở gần nhau như lúc check-in.',
+                'info'
+            );
+        }
+    } catch (err) {
+        showAlert(err.message || 'Check-out thất bại', 'danger');
     }
 }
 

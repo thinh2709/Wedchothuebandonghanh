@@ -15,7 +15,10 @@ import com.hutech.nguyenphucthinh.util.GeoDistanceUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -47,6 +50,9 @@ public class BookingService {
     private NotificationService notificationService;
     @Autowired
     private RealtimeBroadcastService realtimeBroadcastService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Value("${booking.checkin.max-distance-meters:200}")
     private int checkInMaxDistanceMeters;
@@ -194,6 +200,15 @@ public class BookingService {
         }
     }
 
+    private LocalDateTime bookingEndTime(Booking booking) {
+        int duration = booking.getDuration() == null ? 0 : booking.getDuration();
+        return booking.getBookingTime().plusMinutes(duration);
+    }
+
+    private static LocalDateTime now() {
+        return LocalDateTime.now();
+    }
+
     /**
      * Khách gửi GPS check-in. Chỉ chuyển IN_PROGRESS khi companion đã check-in và hai điểm trong bán kính cấu hình.
      */
@@ -206,6 +221,9 @@ public class BookingService {
         }
         if (booking.getStatus() != Booking.Status.ACCEPTED) {
             throw new RuntimeException("Đơn phải ở trạng thái ACCEPTED trước khi check-in GPS");
+        }
+        if (now().isBefore(booking.getBookingTime())) {
+            throw new RuntimeException("Chưa tới giờ hẹn. Bạn chỉ được check-in từ thời gian booking.");
         }
         requireValidGps(lat, lng);
         booking.setCustomerCheckInLatitude(lat);
@@ -224,6 +242,9 @@ public class BookingService {
         }
         if (booking.getStatus() != Booking.Status.ACCEPTED) {
             throw new RuntimeException("Đơn không ở trạng thái ACCEPTED");
+        }
+        if (now().isBefore(booking.getBookingTime())) {
+            throw new RuntimeException("Chưa tới giờ hẹn. Bạn chỉ được check-in từ thời gian booking.");
         }
         requireValidGps(lat, lng);
         booking.setCompanionCheckInLatitude(lat);
@@ -266,6 +287,9 @@ public class BookingService {
         if (booking.getStatus() != Booking.Status.IN_PROGRESS) {
             throw new RuntimeException("Đơn phải ở trạng thái IN_PROGRESS trước khi check-out");
         }
+        if (now().isBefore(bookingEndTime(booking))) {
+            throw new RuntimeException("Chưa tới giờ hết hạn để check-out. Vui lòng chờ hết thời gian booking.");
+        }
         if (booking.getCustomerCheckOutLatitude() != null) {
             throw new RuntimeException("Bạn đã gửi check-out GPS cho đơn này");
         }
@@ -292,6 +316,9 @@ public class BookingService {
         }
         if (booking.getStatus() != Booking.Status.IN_PROGRESS) {
             throw new RuntimeException("Đơn không ở trạng thái IN_PROGRESS");
+        }
+        if (now().isBefore(bookingEndTime(booking))) {
+            throw new RuntimeException("Chưa tới giờ hết hạn để check-out. Vui lòng chờ hết thời gian booking.");
         }
         if (booking.getCompanionCheckOutLatitude() != null) {
             throw new RuntimeException("Bạn đã gửi check-out GPS cho đơn này");
@@ -345,11 +372,27 @@ public class BookingService {
         booking.setCheckOutLatitude((booking.getCustomerCheckOutLatitude() + booking.getCompanionCheckOutLatitude()) / 2.0);
         booking.setCheckOutLongitude((booking.getCustomerCheckOutLongitude() + booking.getCompanionCheckOutLongitude()) / 2.0);
         booking.setStatus(Booking.Status.COMPLETED);
+
+        // Idempotent against concurrent check-out requests:
+        // transactions.booking_id is effectively UNIQUE, so we must prevent charge/notify duplication.
+        if (booking.getId() != null && transactionRepository.findByBookingId(booking.getId()).isPresent()) {
+            return;
+        }
+
         Transaction tx = new Transaction();
         tx.setBooking(booking);
         tx.setAmount(booking.getHoldAmount());
         tx.setStatus(Transaction.Status.COMPLETED);
-        transactionRepository.save(tx);
+
+        try {
+            // Flush ngay để exception unique xảy ra trong try/catch (tránh rollback-only ở commit).
+            transactionRepository.saveAndFlush(tx);
+        } catch (DataIntegrityViolationException ex) {
+            // Another concurrent request already created the transaction for this booking.
+            entityManager.clear();
+            return;
+        }
+
         walletService.chargeForBooking(booking.getCustomer(), booking, booking.getHoldAmount());
         notificationService.create(
                 booking.getCustomer().getId(),
