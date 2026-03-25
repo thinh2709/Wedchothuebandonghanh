@@ -33,7 +33,7 @@ describe('Tracking/GPS/Live map/SOS (E2E)', () => {
 
   const baseLat = 10.762622;
   const baseLng = 106.660172;
-  const noteText = `Booking from Cypress - tracking/gps/sos ${now.toString().slice(-6)}`;
+  const noteText = `Booking demo GPS realtime / SOS ${now.toString().slice(-6)}`;
 
   function visitWithStubs(path) {
     cy.visit(path, {
@@ -161,9 +161,9 @@ describe('Tracking/GPS/Live map/SOS (E2E)', () => {
           method: 'POST',
           url: '/api/companions/me/service-prices',
           body: {
-            serviceName: 'Dịch vụ E2E',
+            serviceName: 'Gói đồng hành cuối tuần',
             pricePerHour: '200000',
-            description: 'Gói test tự động'
+            description: 'Tư vấn vui vẻ, đồng hành theo nhu cầu (demo)'
           }
         }).then((createResp) => {
           state.servicePriceId = createResp.body.id;
@@ -181,9 +181,9 @@ describe('Tracking/GPS/Live map/SOS (E2E)', () => {
       method: 'POST',
       url: '/api/companions/register',
       body: {
-        bio: 'Companion E2E tracking',
-        hobbies: 'Đọc sách',
-        appearance: 'Lịch sự',
+        bio: 'Bạn đồng hành vui vẻ, trò chuyện nhẹ nhàng và tận tâm',
+        hobbies: 'Cà phê, đọc sách, dạo phố',
+        appearance: 'Lịch sự, tinh tế',
         availability: 'Tối thứ 2-6',
         serviceType: 'Tâm sự',
         area: 'Quận 1',
@@ -411,13 +411,13 @@ describe('Tracking/GPS/Live map/SOS (E2E)', () => {
     cy.contains('#booking-body tr', String(state.bookingId)).within(() => {
       cy.get('[data-action="sos"]').should('exist').click();
     });
-    cy.get('#sos-note-input').clear().type('SOS E2E tracking - companion');
+    cy.get('#sos-note-input').clear().type('SOS demo GPS realtime - companion');
     cy.get('#confirm-sos-btn').click();
     cy.wait('@companionSosApi').then(({ request }) => {
       const body = request.body;
       const parsed = typeof body === 'string' ? JSON.parse(body) : body;
       expect(parsed).to.have.property('note');
-      expect(parsed.note).to.include('SOS E2E tracking - companion');
+      expect(parsed.note).to.include('SOS demo GPS realtime - companion');
       expect(Number(parsed.lat)).to.eq(baseLat);
       expect(Number(parsed.lng)).to.eq(baseLng);
     });
@@ -430,7 +430,7 @@ describe('Tracking/GPS/Live map/SOS (E2E)', () => {
     cy.get('#isEmergency').should('be.checked');
     cy.get('#reportCategory').should('have.value', 'OTHER');
     // Tránh race condition: reason có thể đang được init async từ booking.
-    cy.get('#reason').clear().type('SOS E2E tracking - user báo khẩn cấp');
+    cy.get('#reason').clear().type('SOS demo GPS realtime - user báo khẩn cấp');
     cy.get('#report-form').submit();
     cy.wait('@userReportSosApi').then(({ request }) => {
       const body = request.body;
