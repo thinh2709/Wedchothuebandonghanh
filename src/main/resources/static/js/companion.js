@@ -13,7 +13,9 @@ async function getJson(url, options = {}) {
             const json = JSON.parse(text);
             message = json.message || text;
         } catch (_) {}
-        throw new Error(message);
+        const err = new Error(message);
+        err.status = res.status;
+        throw err;
     }
     if (res.status === 204) {
         return null;
@@ -285,6 +287,8 @@ async function loadProfile() {
         document.getElementById('bio').value = profile.bio || '';
         document.getElementById('hobbies').value = profile.hobbies || '';
         document.getElementById('appearance').value = profile.appearance || '';
+        document.getElementById('avatar-url').value = profile.avatarUrl || '';
+        document.getElementById('cover-url').value = profile.coverUrl || '';
         document.getElementById('availability-text').value = profile.availability || '';
         document.getElementById('service-type').value = profile.serviceType || '';
         document.getElementById('area').value = profile.area || '';
@@ -323,6 +327,8 @@ async function saveProfile(e) {
         bio: document.getElementById('bio').value.trim(),
         hobbies: document.getElementById('hobbies').value.trim(),
         appearance: document.getElementById('appearance').value.trim(),
+        avatarUrl: (document.getElementById('avatar-url')?.value || '').trim(),
+            coverUrl: (document.getElementById('cover-url')?.value || '').trim(),
         availability: document.getElementById('availability-text').value.trim(),
         serviceType: document.getElementById('service-type').value.trim(),
         area: document.getElementById('area').value.trim(),
@@ -925,8 +931,23 @@ async function bootstrap() {
             tasks.push(initCompanionChatPage());
         }
         await Promise.all(tasks);
-    } catch (_) {
-        window.location.href = '/user/login.html';
+    } catch (err) {
+        const msg = (err && err.message) ? String(err.message) : '';
+        const status = err && err.status ? Number(err.status) : null;
+
+        // Nếu session/đăng nhập lỗi -> quay về trang login.
+        if (status === 401 || status === 403 || msg.toLowerCase().includes('please login')) {
+            window.location.href = '/user/login.html';
+            return;
+        }
+
+        // Nếu chưa có hồ sơ companion -> điều hướng sang trang đăng ký hồ sơ.
+        if (status === 404 || msg.toLowerCase().includes('hồ sơ companion') || msg.toLowerCase().includes('không tìm thấy hồ sơ')) {
+            window.location.href = '/companion/register.html';
+            return;
+        }
+
+        showAlert(`Lỗi hệ thống: ${msg || 'không rõ'}`, 'danger');
     }
 }
 

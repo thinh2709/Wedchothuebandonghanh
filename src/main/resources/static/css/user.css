@@ -31,7 +31,10 @@ body {
 }
 
 .user-hero {
-    background: var(--u-gradient);
+    background-image: url("/images/stt-du-lich-hai-huoc (1).jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     color: #fff;
     border-radius: var(--u-radius-xl);
     position: relative;
@@ -43,7 +46,7 @@ body {
     content: '';
     position: absolute;
     inset: 0;
-    background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.07' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E");
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.55) 0%, rgba(99, 102, 241, 0.35) 55%, rgba(139, 92, 246, 0.45) 100%);
     pointer-events: none;
 }
 
@@ -335,4 +338,98 @@ body {
 
 main.container {
     animation: userFadeUp 0.4s ease forwards;
+}
+
+/* Căn chỉnh top-nav cho đồng đều chiều dọc */
+#top-nav {
+    align-items: center;
+}
+
+#top-nav .navbar-text {
+    display: flex;
+    align-items: center;
+}
+
+#top-nav #logout-btn {
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+#top-nav #notification-link {
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+#top-nav .app-nav-item {
+    line-height: 1;
+}
+
+/* Responsive top-nav: thu gọn khi màn hình hẹp */
+@media (max-width: 576px) {
+    #top-nav-toggle {
+        display: inline-flex !important;
+    }
+    #top-nav-items {
+        display: none !important;
+        position: fixed;
+        top: 56px;
+        right: 12px;
+        width: 240px;
+        max-width: calc(100vw - 24px);
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 6px !important;
+
+        padding: 12px;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+        z-index: 9999;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        overflow: auto;
+        max-height: 70vh;
+    }
+
+    #top-nav.top-nav-open #top-nav-items {
+        display: flex !important;
+    }
+
+    /* Cho item trong menu dọc */
+    #top-nav-items .app-nav-item {
+        margin-left: 0 !important;
+        color: var(--u-text-primary) !important;
+        padding: 0.7rem 0.9rem !important;
+        border-radius: 12px;
+        font-weight: 600;
+        display: flex !important;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    #top-nav-items .app-nav-item:hover {
+        background: rgba(99, 102, 241, 0.12) !important;
+        color: var(--u-primary) !important;
+    }
+
+    /* Hiện chữ bị ẩn bởi bootstrap d-none/d-*-inline */
+    #top-nav-items .app-nav-text {
+        display: inline !important;
+    }
+
+    #top-nav-items .navbar-text {
+        display: flex !important;
+        align-items: center;
+        padding: 0.7rem 0.9rem !important;
+        border-radius: 12px;
+        font-weight: 700;
+        color: var(--u-text-primary) !important;
+        background: rgba(99, 102, 241, 0.06);
+    }
+
+    #top-nav-items #logout-btn {
+        width: 100%;
+        justify-content: flex-start;
+    }
 }

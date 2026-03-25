@@ -54,6 +54,10 @@ public class Companion {
     @Column(length = 500)
     private String avatarUrl;
 
+    /** Ảnh bìa dùng hiển thị ở card/góc giới thiệu (frontend). */
+    @Column(length = 500)
+    private String coverUrl;
+
     @Column(length = 500)
     private String introVideoUrl;
 

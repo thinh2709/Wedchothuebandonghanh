@@ -25,6 +25,14 @@ public class DatabaseMigration implements CommandLineRunner {
         }
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
+            // JPA ddl-auto=update đã có thể tự tạo, nhưng thêm try/catch cho chắc.
+            stmt.executeUpdate(
+                "ALTER TABLE companions ADD COLUMN cover_url VARCHAR(500)"
+            );
+        } catch (Exception ignored) {
+        }
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
             stmt.executeUpdate("ALTER TABLE companions DROP COLUMN game_rank");
         } catch (Exception ignored) {
         }

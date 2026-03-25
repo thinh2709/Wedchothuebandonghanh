@@ -14,8 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.forEach(companion => {
                     const card = document.createElement('div');
                     card.className = 'companion-card';
+                    const avatarDiv = `
+                        <div class="companion-img">
+                          ${
+                              companion.avatarUrl
+                                  ? `<img src="${String(companion.avatarUrl)}" alt="avatar" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:0;"/>`
+                                  : ''
+                          }
+                        </div>
+                    `;
                     card.innerHTML = `
-                        <div class="companion-img"></div>
+                        ${avatarDiv}
                         <div class="companion-info">
                             <div class="companion-name">${companion.user.fullName || companion.user.username}</div>
                             <div class="companion-bio">${companion.bio || 'Chưa có giới thiệu.'}</div>

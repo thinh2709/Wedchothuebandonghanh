@@ -132,7 +132,11 @@ public class CompanionService {
     }
 
     public Companion getCompanionByUserId(Long userId) {
-        return companionRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ companion"));
+        return companionRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Bạn chưa có hồ sơ companion. Vui lòng đăng ký companion trước."
+                ));
     }
 
     /** Chỉ cập nhật các field có trong request (tránh ghi đè mất dữ liệu khi client gửi thiếu key). */
@@ -168,6 +172,9 @@ public class CompanionService {
         if (request.containsKey("avatarUrl")) {
             companion.setAvatarUrl(request.get("avatarUrl"));
         }
+        if (request.containsKey("coverUrl")) {
+            companion.setCoverUrl(request.get("coverUrl"));
+        }
         if (request.containsKey("introVideoUrl")) {
             companion.setIntroVideoUrl(request.get("introVideoUrl"));
         }
@@ -179,6 +186,43 @@ public class CompanionService {
         companion.setIdentityNumber(identityNumber);
         companion.setIdentityImageUrl(identityImageUrl);
         companion.setPortraitImageUrl(portraitImageUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updateAvatarUrl(Long userId, String avatarUrl) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setAvatarUrl(avatarUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updateCoverUrl(Long userId, String coverUrl) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setCoverUrl(coverUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updateIdentityImages(Long userId, String identityImageUrl, String portraitImageUrl) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setIdentityImageUrl(identityImageUrl);
+        companion.setPortraitImageUrl(portraitImageUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updateIdentityImageUrl(Long userId, String identityImageUrl) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setIdentityImageUrl(identityImageUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updatePortraitImageUrl(Long userId, String portraitImageUrl) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setPortraitImageUrl(portraitImageUrl);
+        return companionRepository.save(companion);
+    }
+
+    public Companion updateIntroMediaUrls(Long userId, String introMediaUrls) {
+        Companion companion = getCompanionByUserId(userId);
+        companion.setIntroMediaUrls(introMediaUrls);
         return companionRepository.save(companion);
     }
 

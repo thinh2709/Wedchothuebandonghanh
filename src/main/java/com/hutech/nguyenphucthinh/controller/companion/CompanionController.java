@@ -8,16 +8,22 @@ import com.hutech.nguyenphucthinh.model.ServicePrice;
 import com.hutech.nguyenphucthinh.model.Withdrawal;
 import com.hutech.nguyenphucthinh.service.companion.CompanionService;
 import com.hutech.nguyenphucthinh.service.user.BookingService;
+import com.hutech.nguyenphucthinh.util.FileStorageUtil;
 import com.hutech.nguyenphucthinh.util.RequestBodyParseUtil;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/companions")
@@ -379,5 +385,75 @@ public class CompanionController {
             throw new RuntimeException("Please login first");
         }
         return companionService.createConsultation(userId, companionId, request.get("question"));
+    }
+
+    private Path uploadsCompanionDir(Long userId) {
+        return Paths.get("uploads", "companions", String.valueOf(userId));
+    }
+
+    @PostMapping(value = "/me/upload/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadAvatar(@RequestParam("file") MultipartFile file, HttpSession session) throws IOException {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+
+        String url = FileStorageUtil.storeImage(file, uploadsCompanionDir(userId), "avatar");
+        companionService.updateAvatarUrl(userId, url);
+        return Map.of("url", url);
+    }
+
+    @PostMapping(value = "/me/upload/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadCover(@RequestParam("file") MultipartFile file, HttpSession session) throws IOException {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+
+        String url = FileStorageUtil.storeImage(file, uploadsCompanionDir(userId), "cover");
+        companionService.updateCoverUrl(userId, url);
+        return Map.of("url", url);
+    }
+
+    @PostMapping(value = "/me/upload/identity-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadIdentityImage(@RequestParam("file") MultipartFile file, HttpSession session) throws IOException {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+
+        String url = FileStorageUtil.storeImage(file, uploadsCompanionDir(userId), "identity");
+        companionService.updateIdentityImageUrl(userId, url);
+        return Map.of("url", url);
+    }
+
+    @PostMapping(value = "/me/upload/portrait-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadPortraitImage(@RequestParam("file") MultipartFile file, HttpSession session) throws IOException {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+
+        String url = FileStorageUtil.storeImage(file, uploadsCompanionDir(userId), "portrait");
+        companionService.updatePortraitImageUrl(userId, url);
+        return Map.of("url", url);
+    }
+
+    @PostMapping(value = "/me/upload/intro-media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadIntroMedia(@RequestParam("files") MultipartFile[] files, HttpSession session) throws IOException {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+
+        if (files == null || files.length == 0) {
+            throw new IllegalArgumentException("Chưa có file ảnh/video");
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (MultipartFile f : files) {
+            if (f == null || f.isEmpty()) continue;
+            String url = FileStorageUtil.storeImage(f, uploadsCompanionDir(userId), "media");
+            if (sb.length() > 0) sb.append(",");
+            sb.append(url);
+        }
+
+        String joined = sb.toString();
+        if (joined.isBlank()) {
+            throw new IllegalArgumentException("Không có file hợp lệ");
+        }
+
+        companionService.updateIntroMediaUrls(userId, joined);
+        return Map.of("url", joined);
     }
 }

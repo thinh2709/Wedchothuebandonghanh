@@ -164,18 +164,47 @@ function renderTopNav(auth) {
     const companionDashboardBtn = auth.authenticated && auth.role === "COMPANION"
         ? `<a class="btn btn-outline-primary btn-sm ms-1 py-1" href="/companion/dashboard.html" title="Dashboard Companion"><i class="bi bi-grid-1x2"></i><span class="app-nav-text ms-1 d-none d-lg-inline">Companion</span></a>`
         : "";
+    const becomeCompanionBtn = auth.authenticated && auth.role === "CUSTOMER"
+        ? `<a class="btn btn-warning btn-sm ms-1 py-1" href="/companion/register.html" title="Trở thành Companion"><i class="bi bi-stars"></i><span class="app-nav-text ms-1 d-none d-lg-inline">Trở thành Companion</span></a>`
+        : "";
     const authPart = auth.authenticated
         ? `<span class="navbar-text ms-1 small text-nowrap"><i class="bi bi-person-circle"></i> <strong>${escapeHtml(auth.username)}</strong></span>
            ${companionDashboardBtn}
+           ${becomeCompanionBtn}
            <button id="logout-btn" type="button" class="btn btn-outline-danger btn-sm ms-1 py-1" title="Đăng xuất"><i class="bi bi-box-arrow-right"></i><span class="app-nav-text ms-1 d-none d-md-inline">Thoát</span></button>`
         : `<a class="btn btn-outline-primary btn-sm ms-1 py-1" href="/user/login.html" title="Đăng nhập"><i class="bi bi-box-arrow-in-right"></i><span class="app-nav-text ms-1 d-none d-sm-inline">Đăng nhập</span></a>
            <a class="btn btn-primary btn-sm ms-1 py-1" href="/user/register.html" title="Đăng ký"><i class="bi bi-person-plus"></i><span class="app-nav-text ms-1 d-none d-sm-inline">Đăng ký</span></a>`;
-    nav.innerHTML = `${links}${authPart}`;
+
+    // Responsive: khi màn hình nhỏ thì thu gọn thành nút và xổ ra danh sách.
+    const toggleBtn = `
+        <button id="top-nav-toggle" class="btn btn-outline-primary btn-sm py-1 d-none" type="button" aria-label="Mở menu">
+            <i class="bi bi-list"></i>
+        </button>
+    `;
+    const itemsWrap = `
+        <div id="top-nav-items" class="d-flex align-items-center flex-wrap gap-1">
+            ${links}
+            ${authPart}
+        </div>
+    `;
+
+    nav.innerHTML = `${toggleBtn}${itemsWrap}`;
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
         logoutBtn.addEventListener("click", async () => {
             await fetch("/api/user/logout", { method: "POST", credentials: "same-origin" });
             window.location.href = "/user/index.html";
+        });
+    }
+
+    const toggle = document.getElementById("top-nav-toggle");
+    const items = document.getElementById("top-nav-items");
+    if (toggle && items) {
+        toggle.addEventListener("click", () => {
+            const willOpen = !nav.classList.contains("top-nav-open");
+            nav.classList.toggle("top-nav-open");
+            // Bảo đảm xổ ra đúng cho dù CSS có !important.
+            items.style.display = willOpen ? "flex" : "none";
         });
     }
 }
@@ -195,22 +224,39 @@ function companionCard(companion) {
     const rating = companion.averageRating ? `${Number(companion.averageRating).toFixed(1)} ★ (${companion.reviewCount || 0})` : "Chưa có đánh giá";
     const onlineClass = companion.onlineStatus ? 'bg-success' : 'bg-secondary';
     const onlineText = companion.onlineStatus ? 'Online' : 'Offline';
-    return `
-    <div class="col">
-      <div class="card user-card h-100">
-        <div class="card-body p-4">
-          <div class="d-flex align-items-center gap-3 mb-3">
-            <div class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:48px;height:48px;background:linear-gradient(135deg,#6366f1,#8b5cf6);">
-              <i class="bi bi-person-fill text-white" style="font-size:1.3rem;"></i>
-            </div>
-            <div>
+    const coverSrc = companion.coverUrl || companion.avatarUrl || null;
+    const avatarHtml = companion.avatarUrl
+        ? `<img src="${escapeHtml(companion.avatarUrl)}" alt="avatar" class="rounded-circle flex-shrink-0" style="width:72px;height:72px;object-fit:cover;">`
+        : `<div class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:72px;height:72px;background:linear-gradient(135deg,#6366f1,#8b5cf6);">
+              <i class="bi bi-person-fill text-white" style="font-size:1.9rem;"></i>
+           </div>`;
+
+    // Banner luôn có avatar chồng 1 lần.
+    const coverBgStyle = coverSrc
+        ? `background-image:url('${escapeHtml(coverSrc)}'); background-size:cover; background-position:center;`
+        : `background:linear-gradient(135deg,#6366f1,#8b5cf6);`;
+    const coverHtml = `<div style="height:120px; position:relative; ${coverBgStyle} overflow:visible;">
+              <div style="position:absolute; left:24px; bottom:-36px;">
+                ${avatarHtml}
+              </div>
+           </div>`;
+
+    // Header: đẩy sang phải để không bị avatar chồng lên.
+    const headerHtml = `<div style="padding-left:96px;">
               <h5 class="card-title mb-0 fw-bold">${escapeHtml(name)}</h5>
               <div class="d-flex align-items-center gap-2 mt-1">
                 <span class="badge bg-warning text-dark" style="font-size:0.75rem;">${rating}</span>
                 <span class="badge ${onlineClass}" style="font-size:0.7rem;"><i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>${onlineText}</span>
               </div>
-            </div>
-          </div>
+           </div>`;
+
+    const cardBodyTopPadding = 'style="padding-top:72px;"';
+    return `
+    <div class="col">
+      <div class="card user-card h-100">
+        ${coverHtml}
+        <div class="card-body p-4" ${cardBodyTopPadding}>
+          ${headerHtml}
           <p class="card-text text-muted small mb-2"><i class="bi bi-chat-quote me-1"></i>${escapeHtml(companion.bio || "Chưa có mô tả")}</p>
           <p class="card-text text-muted small mb-2"><i class="bi bi-heart me-1"></i>${escapeHtml(companion.hobbies || "Chưa có sở thích")}</p>
           <div class="d-flex flex-wrap gap-2 mb-3">

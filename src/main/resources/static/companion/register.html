@@ -61,11 +61,84 @@
                     <input id="appearance" class="form-control" placeholder="Mô tả ngoại hình" required>
                 </div>
                 <div class="col-12">
-                    <label for="availability" class="form-label"><i class="bi bi-clock me-1"></i>Thông tin lịch rảnh tổng quan</label>
-                    <input id="availability" class="form-control" placeholder="VD: Tối 2-6, 18:00 - 22:00">
+                    <label for="availability-option" class="form-label"><i class="bi bi-clock me-1"></i>Thông tin lịch rảnh tổng quan</label>
+                    <select id="availability-option" class="form-select" required>
+                        <option value="" selected>Chọn lịch rảnh tổng quan</option>
+                        <option value="Tối 2-6 (18:00 - 22:00)">Tối 2-6 (18:00 - 22:00)</option>
+                        <option value="Cuối tuần (Thứ 7-CN)">Cuối tuần (Thứ 7-CN)</option>
+                        <option value="Sáng (08:00 - 11:00)">Sáng (08:00 - 11:00)</option>
+                        <option value="Trưa (11:00 - 14:00)">Trưa (11:00 - 14:00)</option>
+                        <option value="Chiều (14:00 - 18:00)">Chiều (14:00 - 18:00)</option>
+                        <option value="Tất cả khung giờ">Tất cả khung giờ</option>
+                        <option value="CUSTOM">Khác (tự nhập)</option>
+                    </select>
+                    <input id="availability-custom" class="form-control mt-2 d-none" placeholder="VD: Tối 2-6, 18:00 - 22:00">
+                </div>
+                <div class="col-md-6">
+                    <label for="service-type" class="form-label"><i class="bi bi-tag me-1"></i>Loại dịch vụ</label>
+                    <input id="service-type" class="form-control" placeholder="VD: Outing / Masseur / Stream...">
+                </div>
+                <div class="col-md-6">
+                    <label for="area" class="form-label"><i class="bi bi-geo-alt me-1"></i>Khu vực thuê</label>
+                    <input id="area" class="form-control" placeholder="VD: TP.HCM, Quận 1; Hà Nội, Cầu Giấy" required>
+                </div>
+                <div class="col-12">
+                    <label for="rental-venues" class="form-label"><i class="bi bi-building me-1"></i>Danh sách nơi thuê</label>
+                    <textarea id="rental-venues" class="form-control" rows="4" placeholder="Mỗi dòng một nơi thuê (tối thiểu 1 dòng)" required></textarea>
+                    <div class="form-text">Khách đặt lịch sẽ bắt buộc chọn một dòng trong danh sách này.</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="gender" class="form-label"><i class="bi bi-gender-ambiguous me-1"></i>Giới tính</label>
+                    <select id="gender" class="form-select" required>
+                        <option value="" selected>Chọn giới tính</option>
+                        <option value="MALE">Nam</option>
+                        <option value="FEMALE">Nữ</option>
+                        <option value="OTHER">Khác</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="avatar-file" class="form-label"><i class="bi bi-image me-1"></i>Ảnh hình đại diện</label>
+                    <input id="avatar-file" class="form-control mt-2" type="file" accept="image/*">
+                    <div class="form-text">Hoặc chọn file ảnh từ máy.</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="cover-file" class="form-label"><i class="bi bi-images me-1"></i>Ảnh bìa</label>
+                    <input id="cover-file" class="form-control mt-2" type="file" accept="image/*">
+                    <div class="form-text">Hoặc chọn file ảnh từ máy.</div>
+                </div>
+                <div class="col-12">
+                    <label for="intro-video-url" class="form-label"><i class="bi bi-play-btn me-1"></i>URL video giới thiệu</label>
+                    <input id="intro-video-url" class="form-control" placeholder="VD: link YouTube/video (tùy chọn)">
+                </div>
+                <div class="col-md-4">
+                    <label for="identity-number" class="form-label"><i class="bi bi-card-text me-1"></i>Số CCCD/CMND</label>
+                    <input id="identity-number" class="form-control" placeholder="Tùy chọn">
+                </div>
+                <div class="col-md-4">
+                    <label for="identity-image-file" class="form-label"><i class="bi bi-image me-1"></i>Ảnh CCCD/CMND</label>
+                    <input id="identity-image-file" class="form-control mt-2" type="file" accept="image/*">
+                    <div class="form-text">Hoặc chọn file từ máy.</div>
+                </div>
+                <div class="col-md-4">
+                    <label for="portrait-image-file" class="form-label"><i class="bi bi-camera me-1"></i>Ảnh chân dung</label>
+                    <input id="portrait-image-file" class="form-control mt-2" type="file" accept="image/*">
+                    <div class="form-text">Hoặc chọn file từ máy.</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="intro-media-files" class="form-label"><i class="bi bi-upload me-1"></i>Tải ảnh/video từ máy</label>
+                    <input id="intro-media-files" class="form-control" type="file" accept="image/*,video/*" multiple>
+                    <div class="form-text">Nếu chọn, hệ thống sẽ upload và tự điền vào `Album ảnh/video`.</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="skills" class="form-label"><i class="bi bi-tools me-1"></i>Kỹ năng / Dịch vụ cung cấp</label>
+                    <textarea id="skills" class="form-control" rows="2" placeholder="Tùy chọn"></textarea>
+                </div>
+                <div class="col-md-6 form-check form-switch pt-4">
+                    <input class="form-check-input" type="checkbox" id="online-toggle" tabindex="0">
+                    <label class="form-check-label fw-semibold" for="online-toggle"><i class="bi bi-wifi me-1"></i>Bật trạng thái Online</label>
                 </div>
                 <div class="col-12 mt-3">
-                    <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-send me-2"></i>Gửi đăng ký</button>
+                    <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-send me-2"></i>Gửi đăng ký & hoàn tất hồ sơ</button>
                 </div>
             </form>
         </div>
