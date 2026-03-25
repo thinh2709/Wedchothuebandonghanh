@@ -97,8 +97,10 @@ public class BookingService {
             throw new RuntimeException("Thời lượng tối thiểu là 30 phút");
         }
         LocalDateTime bookingStart = LocalDateTime.parse(bookingTime);
-        if (bookingStart.isBefore(LocalDateTime.now().plusHours(2))) {
-            throw new RuntimeException("Bạn phải đặt lịch trước ít nhất 2 giờ");
+        // Không còn chặn đặt lịch trước 2 giờ.
+        // Vẫn chặn các booking rơi vào quá khứ để tránh lỗi nghiệp vụ.
+        if (bookingStart.isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Bạn phải đặt lịch trong tương lai");
         }
 
         boolean customerHasActiveBooking = bookingRepository.findByCustomerIdOrderByBookingTimeDesc(customerId)
