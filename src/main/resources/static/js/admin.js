@@ -697,17 +697,33 @@ async function loadDisputesPage() {
 
     disputes.forEach((dispute) => {
         const tr = document.createElement("tr");
+        tr.setAttribute("data-report-id", String(dispute.id));
+        const statusBadgeClass =
+            dispute.status === "RESOLVED"
+                ? "text-bg-success"
+                : dispute.status === "ESCROW_FROZEN"
+                  ? "text-bg-info"
+                  : "text-bg-warning";
+        const disableAllActions = dispute.status === "RESOLVED";
+        const disableFreezeAction = dispute.status === "ESCROW_FROZEN" || disableAllActions;
         tr.innerHTML = `
             <td>${dispute.id}</td>
             <td>${escapeHtml(dispute.reporter || "")}</td>
             <td>${escapeHtml(dispute.reportedUser || "")}</td>
             <td>${escapeHtml(dispute.reason || "")}</td>
-            <td><span class="badge ${dispute.status === "RESOLVED" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(dispute.status)}</span></td>
+            <td>
+                <span class="badge ${statusBadgeClass}" data-cy="dispute-status-badge">${escapeHtml(dispute.status)}</span>
+                ${
+                    dispute.lastAction && dispute.lastAction !== "NONE"
+                        ? `<div class="small text-muted mt-1" data-cy="dispute-last-action">${escapeHtml(dispute.lastAction)}</div>`
+                        : ""
+                }
+            </td>
             <td class="action-group">
-                <button type="button" class="btn btn-sm btn-secondary" data-action="freeze" data-report-id="${dispute.id}">Đóng băng ký quỹ</button>
-                <button type="button" class="btn btn-sm btn-outline-primary" data-action="refund" data-report-id="${dispute.id}">Hoàn tiền</button>
-                <button type="button" class="btn btn-sm btn-outline-success" data-action="payout" data-report-id="${dispute.id}">Thanh toán</button>
-                <button type="button" class="btn btn-sm btn-dark" data-action="close" data-report-id="${dispute.id}">Đóng hồ sơ</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-cy="btn-dispute-freeze" data-action="freeze" data-report-id="${dispute.id}" ${disableFreezeAction ? "disabled" : ""}>Đóng băng ký quỹ</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-cy="btn-dispute-refund" data-action="refund" data-report-id="${dispute.id}" ${disableAllActions ? "disabled" : ""}>Hoàn tiền</button>
+                <button type="button" class="btn btn-sm btn-outline-success" data-cy="btn-dispute-payout" data-action="payout" data-report-id="${dispute.id}" ${disableAllActions ? "disabled" : ""}>Thanh toán</button>
+                <button type="button" class="btn btn-sm btn-dark" data-cy="btn-dispute-close" data-action="close" data-report-id="${dispute.id}" ${disableAllActions ? "disabled" : ""}>Đóng hồ sơ</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -735,13 +751,59 @@ async function processDispute(id, action) {
         return;
     }
     try {
-        await requestJson(`/api/admin/disputes/${encodeURIComponent(id)}/${endpoint}`, {
+        const res = await requestJson(`/api/admin/disputes/${encodeURIComponent(id)}/${endpoint}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: "{}",
         });
-        showAlert("Đã cập nhật xử lý tranh chấp.");
-        await loadDisputesPage();
+        const status = res?.status || (action === "freeze" ? "ESCROW_FROZEN" : "RESOLVED");
+        const lastAction = res?.action || null;
+
+        const row = document.querySelector(`tr[data-report-id="${String(id)}"]`);
+        if (row) {
+            const badge = row.querySelector('[data-cy="dispute-status-badge"]');
+            if (badge) {
+                badge.textContent = String(status);
+                badge.classList.remove("text-bg-success", "text-bg-warning", "text-bg-info");
+                if (status === "RESOLVED") {
+                    badge.classList.add("text-bg-success");
+                } else if (status === "ESCROW_FROZEN") {
+                    badge.classList.add("text-bg-info");
+                } else {
+                    badge.classList.add("text-bg-warning");
+                }
+            }
+
+            const lastActionEl = row.querySelector('[data-cy="dispute-last-action"]');
+            if (lastAction && lastAction !== "NONE") {
+                if (lastActionEl) {
+                    lastActionEl.textContent = String(lastAction);
+                } else {
+                    const statusCell = badge?.parentElement;
+                    if (statusCell) {
+                        const div = document.createElement("div");
+                        div.className = "small text-muted mt-1";
+                        div.setAttribute("data-cy", "dispute-last-action");
+                        div.textContent = String(lastAction);
+                        statusCell.appendChild(div);
+                    }
+                }
+            } else {
+                lastActionEl?.remove();
+            }
+
+            // Freeze là trạng thái trung gian, chỉ disable nút Freeze.
+            // Còn các hành động kết thúc (refund/payout/close) thì disable toàn bộ nút.
+            const btns = row.querySelectorAll('button[data-action]');
+            btns.forEach((btn) => {
+                const a = btn.getAttribute("data-action");
+                btn.disabled = action === "freeze" ? a === "freeze" : true;
+            });
+        } else {
+            await loadDisputesPage();
+        }
+
+        showAlert(res?.message || "Đã cập nhật xử lý tranh chấp.");
     } catch (err) {
         showAlert(err?.message || "Thao tác thất bại.", "danger");
     }

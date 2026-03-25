@@ -638,9 +638,22 @@ async function initBookingPage(auth) {
 async function initAppointmentsPage(auth) {
     if (!requireLogin(auth)) return;
     const box = document.getElementById("appointment-list");
-    const res = await apiFetch("/api/bookings/me", { headers: {} });
-    const bookings = res.ok ? await res.json() : [];
-    box.innerHTML = bookings.length ? bookings.map((b) => {
+    if (!box) return;
+
+    const appointmentsState = (window.__userAppointmentsState ||= {
+        initialized: false,
+        timer: null,
+        isRefreshing: false,
+        lastPayloadKey: ""
+    });
+
+    async function fetchMyBookings() {
+        const res = await apiFetch("/api/bookings/me", { headers: {} });
+        return res.ok ? res.json() : [];
+    }
+
+    function renderBookings(bookings) {
+        box.innerHTML = bookings.length ? bookings.map((b) => {
         const extMax = 120;
         const extApproved = Number(b.extensionMinutesApproved || 0);
         const extRemaining = extMax - extApproved;
@@ -672,70 +685,121 @@ async function initAppointmentsPage(auth) {
           ${(b.status === "ACCEPTED" || b.status === "IN_PROGRESS") ? `<a class="btn btn-danger btn-sm" href="/user/report.html?reportedUserId=${b.companion?.user?.id || ""}&bookingId=${b.id}&emergency=1"><i class="bi bi-exclamation-octagon me-1"></i>SOS</a>` : ""}
         </div>
       </div></div>`;
-    }).join("") : `<div class="empty-state">Bạn chưa có lịch hẹn nào.</div>`;
+        }).join("") : `<div class="empty-state">Bạn chưa có lịch hẹn nào.</div>`;
+    }
 
-    box.querySelectorAll(".booking-action").forEach((btn) => {
-        btn.addEventListener("click", async () => {
+    async function refreshAppointments({ silent } = { silent: false }) {
+        if (appointmentsState.isRefreshing) return;
+        appointmentsState.isRefreshing = true;
+        try {
+            const bookings = await fetchMyBookings();
+            // Tránh re-render liên tục nếu payload không đổi.
+            const payloadKey = JSON.stringify(
+                (Array.isArray(bookings) ? bookings : []).map((b) => ({
+                    id: b?.id,
+                    status: b?.status,
+                    pendingExtensionMinutes: b?.pendingExtensionMinutes,
+                    extensionMinutesApproved: b?.extensionMinutesApproved,
+                    duration: b?.duration,
+                    holdAmount: b?.holdAmount,
+                    bookingTime: b?.bookingTime,
+                    checkInLatitude: b?.checkInLatitude,
+                    checkOutLatitude: b?.checkOutLatitude
+                }))
+            );
+            if (payloadKey !== appointmentsState.lastPayloadKey) {
+                appointmentsState.lastPayloadKey = payloadKey;
+                renderBookings(bookings);
+            } else if (!silent) {
+                // Nếu user vừa bấm thao tác, vẫn render lại để đồng bộ nút/trạng thái.
+                renderBookings(bookings);
+            }
+        } finally {
+            appointmentsState.isRefreshing = false;
+        }
+    }
+
+    if (!appointmentsState.initialized) {
+        appointmentsState.initialized = true;
+        box.addEventListener("click", async (ev) => {
+            const btn = ev.target?.closest?.(".booking-action");
+            if (!btn) return;
             const id = btn.getAttribute("data-id");
             const action = btn.getAttribute("data-action");
+            if (!id || !action) return;
+
+            btn.disabled = true;
             let res;
-            if (action === "check-in") {
-                try {
+            try {
+                if (action === "check-in") {
                     const pos = await getReporterGps();
                     if (pos.lat == null || pos.lng == null) {
-                        alert(
-                            "Không lấy được GPS. Bật định vị, cho phép trình duyệt; cần HTTPS hoặc localhost (xem hướng dẫn trang Tố cáo)."
-                        );
+                        alert("Không lấy được GPS. Bật định vị, cho phép trình duyệt; cần HTTPS hoặc localhost (xem hướng dẫn trang Tố cáo).");
                         return;
                     }
                     res = await apiFetch(`/api/bookings/me/${id}/check-in`, {
                         method: "PATCH",
-                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng }),
+                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng })
                     });
-                } catch (e) {
-                    alert(e?.message || "Lỗi khi lấy GPS.");
-                    return;
-                }
-            } else if (action === "check-out") {
-                try {
+                } else if (action === "check-out") {
                     const pos = await getReporterGps();
                     if (pos.lat == null || pos.lng == null) {
-                        alert(
-                            "Không lấy được GPS. Bật định vị, cho phép trình duyệt; cần HTTPS hoặc localhost (xem hướng dẫn trang Tố cáo)."
-                        );
+                        alert("Không lấy được GPS. Bật định vị, cho phép trình duyệt; cần HTTPS hoặc localhost (xem hướng dẫn trang Tố cáo).");
                         return;
                     }
                     res = await apiFetch(`/api/bookings/me/${id}/check-out`, {
                         method: "PATCH",
-                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng }),
+                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng })
                     });
-                } catch (e) {
-                    alert(e?.message || "Lỗi khi lấy GPS.");
+                } else if (action === "extend") {
+                    res = await apiFetch(`/api/bookings/me/${id}/extension-request`, {
+                        method: "POST",
+                        body: JSON.stringify({ extraMinutes: 30 })
+                    });
+                } else if (action === "extension-cancel") {
+                    res = await apiFetch(`/api/bookings/me/${id}/extension-request/cancel`, { method: "POST", headers: {} });
+                } else {
+                    res = await apiFetch(`/api/bookings/me/${id}/${action}`, { method: "PATCH", headers: {} });
+                }
+
+                if (!res.ok) {
+                    const text = await res.text();
+                    let msg = text || "Thao tác thất bại";
+                    try {
+                        const j = JSON.parse(text);
+                        if (j.message) msg = j.message;
+                    } catch (_) {}
+                    alert(msg);
                     return;
                 }
-            } else if (action === "extend") {
-                res = await apiFetch(`/api/bookings/me/${id}/extension-request`, {
-                    method: "POST",
-                    body: JSON.stringify({ extraMinutes: 30 }),
-                });
-            } else if (action === "extension-cancel") {
-                res = await apiFetch(`/api/bookings/me/${id}/extension-request/cancel`, { method: "POST", headers: {} });
-            } else {
-                res = await apiFetch(`/api/bookings/me/${id}/${action}`, { method: "PATCH", headers: {} });
-            }
-            if (!res.ok) {
-                const text = await res.text();
-                let msg = text || "Thao tác thất bại";
-                try {
-                    const j = JSON.parse(text);
-                    if (j.message) msg = j.message;
-                } catch (_) {}
-                alert(msg);
+            } catch (e) {
+                alert(e?.message || "Thao tác thất bại");
                 return;
+            } finally {
+                btn.disabled = false;
             }
-            await initAppointmentsPage(auth);
+
+            await refreshAppointments({ silent: false });
         });
-    });
+    }
+
+    // Load lần đầu
+    await refreshAppointments({ silent: false });
+
+    // Auto-refresh để user thấy trạng thái đổi khi companion check-in/out.
+    if (!appointmentsState.timer) {
+        appointmentsState.timer = setInterval(() => {
+            const stillOnAppointments = document.body?.dataset?.page === "appointments";
+            if (!stillOnAppointments) return;
+            refreshAppointments({ silent: true }).catch(() => {});
+        }, 4000);
+        window.addEventListener("beforeunload", () => {
+            try {
+                clearInterval(appointmentsState.timer);
+            } catch (_) {}
+            appointmentsState.timer = null;
+        });
+    }
 }
 
 async function initFavoritesPage(auth) {
@@ -1153,9 +1217,12 @@ async function initChatPage(auth) {
         if (myBookingsRes.ok) {
             results.push(...normalizeThreads(await myBookingsRes.json()));
         }
-        const companionBookingsRes = await apiFetch("/api/companions/me/bookings", { headers: {} });
-        if (companionBookingsRes.ok) {
-            results.push(...normalizeThreads(await companionBookingsRes.json()));
+        // Tránh “lẫn booking” với các view của companion khi user chỉ là CUSTOMER.
+        if (auth?.role === "COMPANION") {
+            const companionBookingsRes = await apiFetch("/api/companions/me/bookings", { headers: {} });
+            if (companionBookingsRes.ok) {
+                results.push(...normalizeThreads(await companionBookingsRes.json()));
+            }
         }
         const uniq = new Map();
         results.forEach((item) => {
