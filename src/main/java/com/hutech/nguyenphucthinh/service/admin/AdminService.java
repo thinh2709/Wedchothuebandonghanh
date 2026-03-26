@@ -208,11 +208,15 @@ public class AdminService {
     public Map<String, Object> getTransactionManagementData(String keyword) {
         List<Map<String, Object>> withdrawals = new ArrayList<>();
         for (Withdrawal withdrawal : withdrawalRepository.findByStatusOrderByCreatedAtDesc(Withdrawal.Status.PENDING)) {
+            BigDecimal rate = normalizeCommissionRate(commissionRate);
+            BigDecimal computedCommission = computeCommissionAmount(withdrawal.getAmount(), rate);
+            BigDecimal computedNet = computeNetAmount(withdrawal.getAmount(), computedCommission);
             Map<String, Object> item = new HashMap<>();
             item.put("id", withdrawal.getId());
             item.put("amount", withdrawal.getAmount());
-            item.put("commissionAmount", withdrawal.getCommissionAmount());
-            item.put("netAmount", withdrawal.getNetAmount());
+            // Pending dùng tỷ lệ hiện tại để admin thấy tác động tức thì khi đổi commission rate.
+            item.put("commissionAmount", computedCommission);
+            item.put("netAmount", computedNet);
             item.put("createdAt", withdrawal.getCreatedAt());
             item.put("status", withdrawal.getStatus());
             item.put("bankName", withdrawal.getBankName());
@@ -263,9 +267,21 @@ public class AdminService {
         if (withdrawal.getStatus() != Withdrawal.Status.PENDING) {
             throw new RuntimeException("Chỉ duyệt được lệnh rút tiền đang chờ");
         }
+        BigDecimal rate = normalizeCommissionRate(commissionRate);
+        BigDecimal commission = computeCommissionAmount(withdrawal.getAmount(), rate);
+        BigDecimal net = computeNetAmount(withdrawal.getAmount(), commission);
+        withdrawal.setCommissionAmount(commission);
+        withdrawal.setNetAmount(net);
         withdrawal.setStatus(Withdrawal.Status.APPROVED);
         withdrawalRepository.save(withdrawal);
-        return Map.of("message", "Đã duyệt lệnh rút tiền", "withdrawalId", withdrawalId, "status", withdrawal.getStatus());
+        return Map.of(
+                "message", "Đã duyệt lệnh rút tiền",
+                "withdrawalId", withdrawalId,
+                "status", withdrawal.getStatus(),
+                "commissionRate", rate,
+                "commissionAmount", commission,
+                "netAmount", net
+        );
     }
 
     public Map<String, Object> rejectWithdrawal(Long withdrawalId) {
@@ -539,6 +555,35 @@ public class AdminService {
 
     private static boolean isBlankKeyword(String keyword) {
         return keyword == null || keyword.trim().isEmpty();
+    }
+
+    private BigDecimal normalizeCommissionRate(BigDecimal rate) {
+        if (rate == null || rate.compareTo(BigDecimal.ZERO) < 0) {
+            return BigDecimal.ZERO;
+        }
+        if (rate.compareTo(BigDecimal.ONE) > 0) {
+            return BigDecimal.ONE;
+        }
+        return rate;
+    }
+
+    private BigDecimal computeCommissionAmount(BigDecimal grossAmount, BigDecimal rate) {
+        BigDecimal safeGross = grossAmount == null ? BigDecimal.ZERO : grossAmount;
+        BigDecimal commission = safeGross.multiply(rate).setScale(0, RoundingMode.HALF_UP);
+        if (commission.compareTo(safeGross) > 0) {
+            commission = safeGross;
+        }
+        if (commission.signum() < 0) {
+            commission = BigDecimal.ZERO;
+        }
+        return commission;
+    }
+
+    private BigDecimal computeNetAmount(BigDecimal grossAmount, BigDecimal commission) {
+        BigDecimal safeGross = grossAmount == null ? BigDecimal.ZERO : grossAmount;
+        BigDecimal safeCommission = commission == null ? BigDecimal.ZERO : commission;
+        BigDecimal net = safeGross.subtract(safeCommission);
+        return net.signum() < 0 ? BigDecimal.ZERO : net;
     }
 
     private static String normalizeKeyword(String keyword) {
