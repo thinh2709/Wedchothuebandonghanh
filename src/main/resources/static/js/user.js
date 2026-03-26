@@ -343,38 +343,168 @@ async function initProfilePage(auth) {
         const ratingText = hasRating ? `${Number(avg).toFixed(1)} ★ (${reviewCount})` : "Chưa có đánh giá";
 
         box.innerHTML = `
-            <div class="card user-card"><div class="card-body">
-              ${
-                  companion.avatarUrl
-                      ? `<img src="${escapeHtml(companion.avatarUrl)}" alt="avatar" class="img-fluid rounded mb-3" style="max-height:220px;object-fit:cover;">`
-                      : `<div class="d-flex align-items-center justify-content-center rounded mb-3" style="height:220px;background:linear-gradient(135deg,#6366f1,#8b5cf6);">
-                            <i class="bi bi-person-fill text-white" style="font-size:4rem;"></i>
-                         </div>`
-              }
-              <h1 class="h4 mb-1">${escapeHtml(name)}</h1>
-              <div class="mb-3 text-warning fw-bold">${escapeHtml(ratingText)}</div>
-              <p><strong>Bio:</strong> ${escapeHtml(companion.bio || "Chưa có")}</p>
-              <p><strong>Sở thích:</strong> ${escapeHtml(companion.hobbies || "Chưa có")}</p>
-              <p><strong>Ngoại hình:</strong> ${escapeHtml(companion.appearance || "Chưa có")}</p>
-              <p><strong>Thời gian rảnh:</strong> ${escapeHtml(companion.availability || "Chưa có")}</p>
-              <p><strong>Dịch vụ:</strong> ${escapeHtml(companion.serviceType || "-")}</p>
-              <p><strong>Giá (theo dịch vụ):</strong> ${escapeHtml(formatCompanionHourlyPriceRange(companion))}</p>
-              <p><strong>Khu vực:</strong> ${escapeHtml(companion.area || "-")} | <strong>Giới tính:</strong> ${escapeHtml(companion.gender || "-")}</p>
-              ${
-                  parseRentalVenuesLines(companion.rentalVenues).length
-                      ? `<p><strong>Nơi thuê (gợi ý):</strong><br>${parseRentalVenuesLines(companion.rentalVenues).map((v) => `<span class="badge bg-light text-dark border me-1 mb-1">${escapeHtml(v)}</span>`).join("")}</p>`
-                      : `<p class="text-muted small mb-0"><strong>Nơi thuê:</strong> Companion chưa công bố danh sách trong hồ sơ.</p>`
-              }
-              <p><strong>Tỷ lệ phản hồi:</strong> ${Number(companion.responseRate || 0).toFixed(0)}%</p>
-              ${companion.introVideoUrl ? `<a class="btn btn-sm btn-outline-dark mb-3" href="${escapeHtml(companion.introVideoUrl)}" target="_blank">Xem video giới thiệu</a>` : ""}
-              <div class="d-flex gap-2 flex-wrap">
-                <a class="btn btn-primary" href="/user/booking.html?id=${companion.id}">Đặt lịch</a>
-                <a class="btn btn-outline-secondary" href="/user/review.html">Đánh giá</a>
-                <a class="btn btn-outline-warning" href="/user/report.html?reportedUserId=${companion.user?.id || ""}">Tố cáo / SOS</a>
-                ${auth.authenticated ? `<button id="add-favorite-btn" class="btn btn-outline-danger">Thêm yêu thích</button>` : ""}
-              </div>
-              <div id="profile-message" class="mt-3"></div>
-            </div></div>`;
+            <article class="profile-article">
+                <header class="profile-header-section">
+                    <div class="profile-cover-img"></div>
+                    <div class="container">
+                        <div class="profile-header-container">
+                            <div class="profile-avatar-box">
+                                ${
+                                    companion.avatarUrl
+                                        ? `<img src="${escapeHtml(companion.avatarUrl)}" alt="Avatar">`
+                                        : `<div class="profile-avatar-placeholder"><i class="bi bi-person-fill"></i></div>`
+                                }
+                            </div>
+                            <div class="profile-title-area">
+                                <h1 class="profile-name-title">${escapeHtml(name)}</h1>
+                                <div class="mt-2 text-muted fw-bold d-flex flex-wrap align-items-center gap-3 justify-content-center justify-content-lg-start">
+                                    <span class="profile-rating-badge"><i class="bi bi-star-fill"></i> ${escapeHtml(ratingText)}</span>
+                                    ${companion.onlineStatus 
+                                        ? `<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2 rounded-pill"><i class="bi bi-circle-fill small me-1"></i> Online</span>` 
+                                        : `<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-3 py-2 rounded-pill"><i class="bi bi-circle-fill small me-1"></i> Offline</span>`}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <main class="profile-content-section container pb-5">
+                    <div class="row g-4">
+                        <!-- Sidebar: Basic Info & Actions -->
+                        <aside class="col-lg-4">
+                            <section class="profile-info-card">
+                                <div class="card-header-styled">
+                                    <i class="bi bi-info-circle-fill"></i>
+                                    <h5>Thông tin cơ bản</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="sidebar-details-list">
+                                        <li>
+                                            <i class="bi bi-gender-ambiguous text-primary"></i>
+                                            <span class="detail-label">Giới tính:</span>
+                                            <span class="detail-value">${escapeHtml(companion.gender || "-")}</span>
+                                        </li>
+                                        <li>
+                                            <i class="bi bi-geo-alt-fill text-danger"></i>
+                                            <span class="detail-label">Khu vực:</span>
+                                            <span class="detail-value">${escapeHtml(companion.area || "-")}</span>
+                                        </li>
+                                        <li>
+                                            <i class="bi bi-grid-fill text-success"></i>
+                                            <span class="detail-label">Dịch vụ:</span>
+                                            <span class="detail-value">${escapeHtml(companion.serviceType || "-")}</span>
+                                        </li>
+                                        <li>
+                                            <i class="bi bi-cash-stack text-warning"></i>
+                                            <span class="detail-label">Giá (h/h):</span>
+                                            <span class="detail-value text-primary fw-bold">${escapeHtml(formatCompanionHourlyPriceRange(companion))}</span>
+                                        </li>
+                                        <li>
+                                            <i class="bi bi-chat-dots-fill text-info"></i>
+                                            <span class="detail-label">Phản hồi:</span>
+                                            <span class="detail-value">${Number(companion.responseRate || 0).toFixed(0)}%</span>
+                                        </li>
+                                    </ul>
+
+                                    <div class="profile-actions-grid mt-4">
+                                        <a class="btn btn-primary profile-btn-main shadow-sm" href="/user/booking.html?id=${companion.id}">
+                                            <i class="bi bi-calendar-check-fill"></i> Đặt lịch ngay
+                                        </a>
+                                        ${auth.authenticated ? `<button id="add-favorite-btn" class="btn btn-outline-danger profile-btn-main bg-white"><i class="bi bi-heart-fill"></i> Thêm yêu thích</button>` : ""}
+                                    </div>
+                                    
+                                    <div class="d-flex gap-2 mt-3">
+                                        <a class="btn btn-light-action flex-grow-1" href="/user/review.html">
+                                            <i class="bi bi-star me-1"></i> Đánh giá
+                                        </a>
+                                        <a class="btn btn-report-sos flex-grow-1" href="/user/report.html?reportedUserId=${companion.user?.id || ""}">
+                                            <i class="bi bi-exclamation-octagon me-1"></i> Tố cáo/SOS
+                                        </a>
+                                    </div>
+                                    
+                                    <div id="profile-message" class="mt-3 text-center"></div>
+                                </div>
+                            </section>
+                        </aside>
+
+                        <!-- Main Details Content -->
+                        <div class="col-lg-8">
+                            <div class="d-flex flex-column gap-4">
+                                
+                                <!-- Bio -->
+                                <section class="profile-info-card">
+                                    <div class="card-header-styled">
+                                        <i class="bi bi-person-lines-fill text-indigo" style="color: #6366f1;"></i>
+                                        <h5>Giới thiệu bản thân (Bio)</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="bio-text">${escapeHtml(companion.bio || "Chưa có mô tả chi tiết.")}</div>
+                                    </div>
+                                </section>
+
+                                <!-- Traits & Hobbies and Schedule -->
+                                <div class="row g-4">
+                                    <div class="col-md-6 d-flex">
+                                        <section class="profile-info-card w-100">
+                                            <div class="card-header-styled">
+                                                <i class="bi bi-stars text-purple" style="color: #8b5cf6;"></i>
+                                                <h5>Ngoại hình & Thể chất</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-3">
+                                                    <h6 class="fw-bold text-muted mb-1">Ngoại hình</h6>
+                                                    <p class="mb-0 fw-medium">${escapeHtml(companion.appearance || "Chưa có")}</p>
+                                                </div>
+                                                <div>
+                                                    <h6 class="fw-bold text-muted mb-1">Sở thích</h6>
+                                                    <p class="mb-0 fw-medium text-secondary"><i class="bi bi-heart me-1"></i>${escapeHtml(companion.hobbies || "Chưa có")}</p>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    </div>
+                                    <div class="col-md-6 d-flex">
+                                        <section class="profile-info-card w-100">
+                                            <div class="card-header-styled">
+                                                <i class="bi bi-clock-history text-success"></i>
+                                                <h5>Lịch rảnh & Nơi thuê</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-3">
+                                                    <h6 class="fw-bold text-muted mb-1">Thời gian rảnh</h6>
+                                                    <p class="mb-0 fw-medium"><i class="bi bi-calendar-event me-1"></i>${escapeHtml(companion.availability || "Chưa có")}</p>
+                                                </div>
+                                                <div>
+                                                    <h6 class="fw-bold text-muted mb-1">Nơi thuê (Gợi ý)</h6>
+                                                    ${
+                                                        parseRentalVenuesLines(companion.rentalVenues).length
+                                                            ? `<div class="venues-badges mt-2">${parseRentalVenuesLines(companion.rentalVenues).map((v) => `<span class="badge rounded-pill">${escapeHtml(v)}</span>`).join("")}</div>`
+                                                            : `<p class="text-muted small mb-0 fst-italic">Companion chưa công bố danh sách nơi thuê.</p>`
+                                                    }
+                                                </div>
+                                            </div>
+                                        </section>
+                                    </div>
+                                </div>
+
+                                <!-- Video -->
+                                ${companion.introVideoUrl ? `
+                                <section class="profile-info-card">
+                                    <div class="card-header-styled">
+                                        <i class="bi bi-play-circle-fill text-danger"></i>
+                                        <h5>Video giới thiệu</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="text-center mb-3">
+                                            <a class="btn btn-outline-dark" href="${escapeHtml(companion.introVideoUrl)}" target="_blank"><i class="bi bi-play-circle-fill me-2"></i>Mở link video giới thiệu</a>
+                                        </div>
+                                    </div>
+                                </section>
+                                ` : ""}
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </article>`;
 
         const addBtn = document.getElementById("add-favorite-btn");
         if (addBtn) {
@@ -1539,6 +1669,28 @@ function initAuthPages() {
                 setMessage("auth-message", "danger", result.message || "Đăng ký thất bại");
             }
         });
+    }
+
+    // Toggle hiển thị mật khẩu (login/register).
+    // - Input: id="password"
+    // - Nút: id="toggle-password-visibility"
+    // - Icon: id="toggle-password-icon"
+    const pwInput = document.getElementById("password");
+    const toggleBtn = document.getElementById("toggle-password-visibility");
+    const toggleIcon = document.getElementById("toggle-password-icon");
+    if (pwInput && toggleBtn && toggleIcon) {
+        const syncIcon = () => {
+            const isVisible = pwInput.type === "text";
+            toggleIcon.classList.toggle("bi-eye", !isVisible);
+            toggleIcon.classList.toggle("bi-eye-slash", isVisible);
+            toggleBtn.setAttribute("aria-pressed", String(isVisible));
+        };
+        toggleBtn.addEventListener("click", () => {
+            const isVisible = pwInput.type === "text";
+            pwInput.type = isVisible ? "password" : "text";
+            syncIcon();
+        });
+        syncIcon();
     }
 
     const params = new URLSearchParams(window.location.search);
