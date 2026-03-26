@@ -144,6 +144,15 @@ public class AdminService {
         User user = userRepository.findById(userId).orElseThrow();
         user.setModerationFlag(User.ModerationFlag.WARNED);
         userRepository.save(user);
+        try {
+            notificationService.create(
+                    userId,
+                    "Cảnh báo tài khoản",
+                    "Tài khoản của bạn đã bị cảnh báo do vi phạm/quy tắc cộng đồng. Vui lòng tuân thủ chính sách để tránh bị khóa."
+            );
+        } catch (Exception ignored) {
+            // Không chặn nghiệp vụ cảnh cáo nếu notification lỗi.
+        }
         return Map.of("message", "Đã cảnh cáo người dùng", "userId", userId, "flag", "WARNED");
     }
 

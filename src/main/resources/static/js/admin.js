@@ -142,6 +142,20 @@ function getPageSearchKeyword() {
     return document.querySelector('[data-cy="search-input"]')?.value?.trim() || "";
 }
 
+function clearPageSearchKeyword() {
+    const input = document.querySelector('[data-cy="search-input"]');
+    if (input) {
+        input.value = "";
+    }
+}
+
+function renderEmptyRow(tbody, colSpan, message) {
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="${Number(colSpan) || 1}" class="text-center text-muted">${escapeHtml(
+        message || "Không có dữ liệu."
+    )}</td></tr>`;
+}
+
 function wireAdminSearch(runSearch) {
     const input = document.querySelector('[data-cy="search-input"]');
     const btn = document.querySelector('[data-cy="search-btn"]');
@@ -532,12 +546,16 @@ async function moderateCompanion(id, isApprove, tableBodyId) {
 async function loadUsersPage(keyword) {
     const usersBody = document.getElementById("users-body");
     const companionsBody = document.getElementById("companions-body");
+    if (!usersBody || !companionsBody) return;
     const k = keyword !== undefined && keyword !== null ? String(keyword).trim() : getPageSearchKeyword();
     const q = k ? `?keyword=${encodeURIComponent(k)}` : "";
     const data = await requestJson(`/api/admin/users${q}`);
     usersBody.innerHTML = "";
     companionsBody.innerHTML = "";
 
+    if (!data?.users?.length) {
+        renderEmptyRow(usersBody, 6, "Không có tài khoản phù hợp.");
+    }
     data.users.forEach((user) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -555,6 +573,9 @@ async function loadUsersPage(keyword) {
         usersBody.appendChild(tr);
     });
 
+    if (!data?.companions?.length) {
+        renderEmptyRow(companionsBody, 5, "Không có companion phù hợp.");
+    }
     data.companions.forEach((companion) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -606,11 +627,12 @@ async function loadModerationPage(keyword) {
     await loadPendingCompanions("moderation-pending-body", k);
 
     const reviewsBody = document.getElementById("reviews-body");
+    if (!reviewsBody) return;
     const rq = k ? `?keyword=${encodeURIComponent(k)}` : "";
     const reviews = await requestJson(`/api/admin/moderation/reviews${rq}`);
     reviewsBody.innerHTML = "";
     if (!reviews.length) {
-        reviewsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có review cần xử lý.</td></tr>';
+        renderEmptyRow(reviewsBody, 6, "Không có review cần xử lý.");
         return;
     }
 
@@ -650,9 +672,10 @@ async function loadTransactionsPage(keyword) {
     }
 
     const tbody = document.getElementById("withdrawals-body");
+    if (!tbody) return;
     tbody.innerHTML = "";
     if (!data.pendingWithdrawals.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Không có lệnh rút tiền chờ duyệt.</td></tr>';
+        renderEmptyRow(tbody, 9, "Không có lệnh rút tiền chờ duyệt.");
         return;
     }
 
@@ -709,9 +732,10 @@ async function saveCommissionRate(event) {
 async function loadDisputesPage() {
     const disputes = await requestJson("/api/admin/disputes");
     const tbody = document.getElementById("disputes-body");
+    if (!tbody) return;
     tbody.innerHTML = "";
     if (!disputes || !disputes.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có tranh chấp.</td></tr>';
+        renderEmptyRow(tbody, 6, "Không có tranh chấp.");
         return;
     }
 
@@ -1309,10 +1333,12 @@ function setupPageEvents() {
     if (path.endsWith("/dashboard.html")) {
         document.getElementById("reload-pending-btn")?.addEventListener("click", async () => {
             clearAlert();
+            clearPageSearchKeyword();
             await loadDashboardStats();
-            await loadPendingCompanions("pending-body");
+            await loadPendingCompanions("pending-body", "");
             adminChartState.payload = null;
             await loadAdminDashboardCharts();
+            showAlert("Đã tải lại dữ liệu.", "success");
         });
         document.getElementById("admin-chart-range")?.addEventListener("change", async (e) => {
             adminChartState.range = e.target.value;
@@ -1322,21 +1348,27 @@ function setupPageEvents() {
     if (path.endsWith("/users.html")) {
         document.getElementById("reload-users-btn")?.addEventListener("click", async () => {
             clearAlert();
-            await loadUsersPage();
+            clearPageSearchKeyword();
+            await loadUsersPage("");
+            showAlert("Đã tải lại danh sách.", "success");
         });
         wireAdminSearch(() => loadUsersPage());
     }
     if (path.endsWith("/moderation.html")) {
         document.getElementById("reload-moderation-btn")?.addEventListener("click", async () => {
             clearAlert();
-            await loadModerationPage();
+            clearPageSearchKeyword();
+            await loadModerationPage("");
+            showAlert("Đã tải lại danh sách.", "success");
         });
         wireAdminSearch(() => loadModerationPage());
     }
     if (path.endsWith("/transactions.html")) {
         document.getElementById("reload-transactions-btn")?.addEventListener("click", async () => {
             clearAlert();
-            await loadTransactionsPage();
+            clearPageSearchKeyword();
+            await loadTransactionsPage("");
+            showAlert("Đã tải lại danh sách.", "success");
         });
         wireAdminSearch(() => loadTransactionsPage());
         document.getElementById("commission-form")?.addEventListener("submit", saveCommissionRate);
@@ -1348,12 +1380,14 @@ function setupPageEvents() {
             if (adminTrackingState.selectedId) {
                 await selectBookingForTracking(adminTrackingState.selectedId);
             }
+            showAlert("Đã tải lại danh sách.", "success");
         });
     }
     if (path.endsWith("/disputes.html")) {
         document.getElementById("reload-disputes-btn")?.addEventListener("click", async () => {
             clearAlert();
             await loadDisputesPage();
+            showAlert("Đã tải lại danh sách.", "success");
         });
     }
 }

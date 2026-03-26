@@ -1,5 +1,26 @@
+const accountWarningState = {
+    last: "",
+    lastAt: 0
+};
+
+function showAccountWarningOnce(message) {
+    const msg = String(message || "").trim();
+    if (!msg) return;
+    const now = Date.now();
+    // Chống spam nếu nhiều request liên tiếp.
+    if (accountWarningState.last === msg && now - accountWarningState.lastAt < 15000) return;
+    accountWarningState.last = msg;
+    accountWarningState.lastAt = now;
+    // Ưu tiên toast (nếu đã có), fallback alert.
+    try {
+        showUserNotificationToast({ title: "Cảnh báo tài khoản", content: msg });
+    } catch (_) {
+        alert(msg);
+    }
+}
+
 async function apiFetch(url, options = {}) {
-    return fetch(url, {
+    const res = await fetch(url, {
         credentials: "same-origin",
         headers: {
             "Content-Type": "application/json",
@@ -7,6 +28,11 @@ async function apiFetch(url, options = {}) {
         },
         ...options
     });
+    try {
+        const warning = res.headers?.get?.("X-Account-Warning");
+        if (warning) showAccountWarningOnce(warning);
+    } catch (_) {}
+    return res;
 }
 
 function escapeHtml(value) {
@@ -952,9 +978,10 @@ async function initFavoritesPage(auth) {
         btn.addEventListener("click", async () => {
             const id = btn.getAttribute("data-id");
             const del = await apiFetch(`/api/favorites/${id}`, { method: "DELETE", headers: {} });
-            if (del.ok) {
-                await initFavoritesPage(auth);
-            }
+            if (del.ok) return initFavoritesPage(auth);
+
+            const msg = await parseApiErrorMessage(del, "Xóa khỏi yêu thích thất bại");
+            alert(msg);
         });
     });
 }
@@ -1643,9 +1670,17 @@ function initAuthPages() {
             });
             const result = await res.json();
             if (result.success) {
-                if (result.role === "ADMIN") window.location.href = "/admin/dashboard.html";
-                else if (result.role === "COMPANION") window.location.href = "/companion/dashboard.html";
-                else window.location.href = "/user/index.html";
+                if (result.warningMessage) {
+                    setMessage("auth-message", "warning", result.warningMessage);
+                }
+                const go = () => {
+                    if (result.role === "ADMIN") window.location.href = "/admin/dashboard.html";
+                    else if (result.role === "COMPANION") window.location.href = "/companion/dashboard.html";
+                    else window.location.href = "/user/index.html";
+                };
+                // Nếu có cảnh báo thì cho user thấy 1 nhịp rồi mới chuyển trang.
+                if (result.warningMessage) setTimeout(go, 1200);
+                else go();
             } else {
                 setMessage("auth-message", "danger", result.message || "Đăng nhập thất bại");
             }
