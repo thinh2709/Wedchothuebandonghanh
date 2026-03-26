@@ -338,8 +338,28 @@ function bindLogout() {
         return;
     }
     logoutBtn.addEventListener("click", async () => {
-        await fetch("/logout", { method: "POST" });
-        window.location.href = "/user/index.html";
+        clearAlert();
+        logoutBtn.disabled = true;
+        try {
+            const res = await fetch("/api/user/logout", { method: "POST", credentials: "same-origin" });
+            let data = null;
+            try {
+                data = await res.json();
+            } catch (_) {
+                // Some responses might not return JSON; we treat ok status as success.
+            }
+            if (!res.ok) {
+                throw new Error(data?.message || "Đăng xuất thất bại");
+            }
+            if (data && data.success === false) {
+                throw new Error(data.message || "Đăng xuất thất bại");
+            }
+            window.location.href = "/user/index.html";
+        } catch (e) {
+            showAlert(e?.message || "Đăng xuất thất bại.", "danger");
+        } finally {
+            logoutBtn.disabled = false;
+        }
     });
 }
 
