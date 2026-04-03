@@ -3,10 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "cy:open": "cypress open",
-    "cy:run": "cypress run"
+    "cy:open": "wait-on http://127.0.0.1:8080 && cypress open",
+    "cy:open:direct": "cypress open",
+    "cy:run": "wait-on http://127.0.0.1:8080 && cypress run",
+    "cy:run:direct": "cypress run",
+    "cy:run:a": "wait-on http://127.0.0.1:8080 && cypress run --spec cypress/e2e/group-a-login.cy.js",
+    "cy:run:a:random": "wait-on http://127.0.0.1:8080 && cypress run --spec cypress/e2e/group-a-login.cy.js --env E2E_REGISTER_RANDOM=true",
+    "cy:run:reg": "wait-on http://127.0.0.1:8080 && cypress run --spec cypress/e2e/group-a-register-random.cy.js",
+    "cy:run:b": "wait-on http://127.0.0.1:8080 && cypress run --spec cypress/e2e/group-b-search.cy.js",
+    "cy:run:c": "wait-on http://127.0.0.1:8080 && cypress run --spec cypress/e2e/group-c-wallet.cy.js",
+    "cy:run:d": "wait-on http://127.0.0.1:8080 && cypress run --spec cypress/e2e/group-d-review.cy.js",
+    "spring:dbtest": "mvn -q spring-boot:run -Dspring-boot.run.profiles=dbtest"
   },
   "devDependencies": {
-    "cypress": "^15.13.0"
+    "cypress": "^15.13.0",
+    "wait-on": "^9.0.4"
   }
 }

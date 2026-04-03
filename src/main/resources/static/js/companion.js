@@ -11,7 +11,7 @@ async function getJson(url, options = {}) {
         let message = text;
         try {
             const json = JSON.parse(text);
-            message = json.message || text;
+            message = json.message || json.error || text;
         } catch (_) {}
         const err = new Error(message);
         err.status = res.status;
@@ -21,6 +21,10 @@ async function getJson(url, options = {}) {
         return null;
     }
     return res.json();
+}
+
+function isChatAllowedStatus(status) {
+    return status === 'ACCEPTED' || status === 'IN_PROGRESS';
 }
 
 function escapeHtml(value) {
@@ -599,7 +603,10 @@ async function loadBookings() {
         const canCheckIn = item.status === 'ACCEPTED';
         const canCheckOut = item.status === 'IN_PROGRESS';
         const canSos = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS';
-        const canChat = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS' || item.status === 'COMPLETED';
+        const canCancelRequest = item.status === 'ACCEPTED' && !item.cancelRequestPending;
+        const canCancelConfirm = item.status === 'ACCEPTED' && item.cancelRequestPending && item.cancelRequestedByRole === 'CUSTOMER';
+        const waitingCancelConfirm = item.status === 'ACCEPTED' && item.cancelRequestPending && item.cancelRequestedByRole === 'COMPANION';
+        const canChat = item.status === 'ACCEPTED' || item.status === 'IN_PROGRESS';
         const hasPendingExt = item.pendingExtensionMinutes != null;
         const extLine = hasPendingExt
             ? `<div class="small text-warning mb-1">Khách xin gia hạn +${item.pendingExtensionMinutes} phút</div>`
@@ -617,6 +624,9 @@ async function loadBookings() {
                 <button class="btn btn-sm btn-outline-secondary me-2" data-action="ext-reject">Từ chối gia hạn</button>` : ''}
                 ${canCheckIn ? `<button class="btn btn-sm btn-outline-primary me-2" data-action="checkin">Check-in</button>` : ''}
                 ${canCheckOut ? `<button class="btn btn-sm btn-outline-success me-2" data-action="checkout">Check-out</button>` : ''}
+                ${canCancelRequest ? `<button class="btn btn-sm btn-outline-danger me-2" data-action="cancel-request">Yêu cầu hủy</button>` : ''}
+                ${canCancelConfirm ? `<button class="btn btn-sm btn-danger me-2" data-action="cancel-confirm">Xác nhận hủy</button>` : ''}
+                ${waitingCancelConfirm ? `<span class="badge text-bg-warning me-2">Đã gửi yêu cầu hủy, chờ khách xác nhận</span>` : ''}
                 ${canChat ? `<a class="btn btn-sm btn-outline-dark me-2" href="/user/chat.html?bookingId=${item.id}">Chat/Call</a>` : ''}
                 ${canSos ? `<button class="btn btn-sm btn-danger" data-action="sos"><i class="bi bi-exclamation-octagon me-1"></i>SOS</button>` : ''}
             </td>`;
@@ -634,6 +644,37 @@ async function loadBookings() {
         if (canCheckOut) {
             tr.querySelector('[data-action="checkout"]').addEventListener('click', () => checkOutBooking(item.id));
         }
+        tr.querySelector('[data-action="cancel-request"]')?.addEventListener('click', async () => {
+            try {
+                const loc = await getCurrentLocation();
+                if (loc.lat == null || loc.lng == null) {
+                    showAlert('Không lấy được GPS. Bật định vị và dùng HTTPS/localhost để gửi yêu cầu hủy.', 'warning');
+                    return;
+                }
+                await sendJson(`/api/companions/me/bookings/${item.id}/cancel-request`, 'POST', { lat: loc.lat, lng: loc.lng });
+                await loadBookings();
+                await loadBookingWorkflow();
+                showAlert(`Đã gửi yêu cầu hủy cho booking #${item.id}.`, 'info');
+            } catch (err) {
+                showAlert(err.message || 'Gửi yêu cầu hủy thất bại', 'danger');
+            }
+        });
+        tr.querySelector('[data-action="cancel-confirm"]')?.addEventListener('click', async () => {
+            try {
+                const loc = await getCurrentLocation();
+                if (loc.lat == null || loc.lng == null) {
+                    showAlert('Không lấy được GPS. Bật định vị và dùng HTTPS/localhost để xác nhận hủy.', 'warning');
+                    return;
+                }
+                await sendJson(`/api/companions/me/bookings/${item.id}/cancel-confirm`, 'POST', { lat: loc.lat, lng: loc.lng });
+                await loadBookings();
+                await loadBookingWorkflow();
+                await loadIncomeStats();
+                showAlert(`Đã xác nhận hủy booking #${item.id}.`, 'success');
+            } catch (err) {
+                showAlert(err.message || 'Xác nhận hủy thất bại', 'danger');
+            }
+        });
         tr.querySelector('[data-action="sos"]')?.addEventListener('click', () => openSosModal(item));
         rows.appendChild(tr);
     });
@@ -1243,6 +1284,7 @@ async function initCompanionChatPage() {
                 status: b.status || '-',
                 bookingTime: b.bookingTime
             }))
+            .filter(t => isChatAllowedStatus(t.status))
             .sort((a, b) => (new Date(b.bookingTime || 0)).getTime() - (new Date(a.bookingTime || 0)).getTime());
     }
 
@@ -1250,7 +1292,7 @@ async function initCompanionChatPage() {
         if (currentBookingId && threads.some(t => t.bookingId === currentBookingId)) {
             return currentBookingId;
         }
-        const preferred = threads.find(t => ['IN_PROGRESS', 'ACCEPTED', 'PENDING', 'COMPLETED'].includes(t.status));
+        const preferred = threads.find(t => isChatAllowedStatus(t.status));
         return preferred ? preferred.bookingId : (threads[0]?.bookingId || 0);
     }
 
@@ -1285,14 +1327,14 @@ async function initCompanionChatPage() {
         const box = document.getElementById('chat-list');
         if (!box) return;
         if (!currentBookingId) {
-            box.innerHTML = '<div class="text-muted">Chưa có cuộc trò chuyện để hiển thị.</div>';
+            box.innerHTML = '<div class="text-muted">Chưa có cuộc trò chuyện khả dụng (chỉ hiện đơn ACCEPTED/IN_PROGRESS).</div>';
             return;
         }
         let list = [];
         try {
             list = await getJson(`/api/chat/${currentBookingId}/messages`);
         } catch (err) {
-            box.innerHTML = `<div class="text-danger">Không thể tải tin nhắn: ${escapeHtml(err.message || 'Lỗi không xác định')}</div>`;
+            box.innerHTML = `<div class="text-muted">${escapeHtml(err.message || 'Không thể tải tin nhắn.')}</div>`;
             return;
         }
         box.innerHTML = list.length ? list.map(m => `

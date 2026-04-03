@@ -84,6 +84,25 @@ public class Booking {
 
     private Double companionCheckOutLongitude;
 
+    /** Quy trình hủy 2 bước cho đơn ACCEPTED. */
+    private Boolean cancelRequestPending = false;
+
+    /** CUSTOMER hoặc COMPANION — ai khởi tạo yêu cầu hủy. */
+    @Column(length = 20)
+    private String cancelRequestedByRole;
+
+    private LocalDateTime cancelRequestAt;
+
+    private Double cancelRequesterLatitude;
+
+    private Double cancelRequesterLongitude;
+
+    private Double cancelConfirmerLatitude;
+
+    private Double cancelConfirmerLongitude;
+
+    private LocalDateTime cancelConfirmedAt;
+
     /** Vị trí chia sẻ realtime (đơn ACCEPTED / IN_PROGRESS), cập nhật định kỳ từ app. */
     private Double liveLatitude;
 

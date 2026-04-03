@@ -62,6 +62,9 @@ public class BookingService {
     @Value("${booking.extension.max-minutes:120}")
     private int maxExtensionMinutesTotal;
 
+    @Value("${booking.cancel.alert-distance-meters:200}")
+    private int cancelAlertDistanceMeters;
+
     private BigDecimal calculateHoldAmount(BigDecimal pricePerHour, Integer duration) {
         if (pricePerHour == null) pricePerHour = new BigDecimal("200000");
 
@@ -215,6 +218,9 @@ public class BookingService {
         if (booking.getStatus() == Booking.Status.IN_PROGRESS) {
             throw new RuntimeException("Booking đang diễn ra, không thể hủy");
         }
+        if (booking.getStatus() == Booking.Status.ACCEPTED) {
+            throw new RuntimeException("Đơn ACCEPTED cần quy trình 2 bước: gửi yêu cầu hủy rồi chờ bên còn lại xác nhận.");
+        }
         booking.setPendingExtensionMinutes(null);
         booking.setPendingExtensionRequestedAt(null);
         if (booking.getStatus() == Booking.Status.PENDING || booking.getStatus() == Booking.Status.ACCEPTED) {
@@ -229,7 +235,48 @@ public class BookingService {
                 "Booking đã hủy",
                 "Đơn #" + booking.getId() + " đã được hủy theo chính sách hoàn tiền."
         );
+        resetCancelWorkflow(booking);
         return bookingRepository.save(booking);
+    }
+
+    @Transactional
+    public Booking requestCancelByCustomer(Long customerId, Long bookingId, Double lat, Double lng) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
+        if (!booking.getCustomer().getId().equals(customerId)) {
+            throw new RuntimeException("Bạn không có quyền thao tác đơn này");
+        }
+        return requestCancelAcceptedBooking(booking, "CUSTOMER", lat, lng);
+    }
+
+    @Transactional
+    public Booking requestCancelByCompanion(Long companionUserId, Long bookingId, Double lat, Double lng) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
+        if (!booking.getCompanion().getUser().getId().equals(companionUserId)) {
+            throw new RuntimeException("Bạn không có quyền thao tác đơn này");
+        }
+        return requestCancelAcceptedBooking(booking, "COMPANION", lat, lng);
+    }
+
+    @Transactional
+    public Booking confirmCancelByCustomer(Long customerId, Long bookingId, Double lat, Double lng) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
+        if (!booking.getCustomer().getId().equals(customerId)) {
+            throw new RuntimeException("Bạn không có quyền thao tác đơn này");
+        }
+        return confirmCancelAcceptedBooking(booking, "CUSTOMER", lat, lng);
+    }
+
+    @Transactional
+    public Booking confirmCancelByCompanion(Long companionUserId, Long bookingId, Double lat, Double lng) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt lịch"));
+        if (!booking.getCompanion().getUser().getId().equals(companionUserId)) {
+            throw new RuntimeException("Bạn không có quyền thao tác đơn này");
+        }
+        return confirmCancelAcceptedBooking(booking, "COMPANION", lat, lng);
     }
 
     private BigDecimal calculateRefundAmount(Booking booking) {
@@ -252,6 +299,140 @@ public class BookingService {
 
     private static LocalDateTime now() {
         return LocalDateTime.now();
+    }
+
+    private Booking requestCancelAcceptedBooking(Booking booking, String requestedRole, Double lat, Double lng) {
+        if (booking.getStatus() != Booking.Status.ACCEPTED) {
+            throw new RuntimeException("Chỉ cho phép gửi yêu cầu hủy khi đơn ở trạng thái ACCEPTED");
+        }
+        if (Boolean.TRUE.equals(booking.getCancelRequestPending())) {
+            throw new RuntimeException("Đã có yêu cầu hủy đang chờ bên còn lại xác nhận");
+        }
+        requireValidGps(lat, lng);
+        booking.setCancelRequestPending(true);
+        booking.setCancelRequestedByRole(requestedRole);
+        booking.setCancelRequestAt(now());
+        booking.setCancelRequesterLatitude(lat);
+        booking.setCancelRequesterLongitude(lng);
+        booking.setCancelConfirmerLatitude(null);
+        booking.setCancelConfirmerLongitude(null);
+        booking.setCancelConfirmedAt(null);
+        booking.setPendingExtensionMinutes(null);
+        booking.setPendingExtensionRequestedAt(null);
+        Booking saved = bookingRepository.save(booking);
+        notifyCancelRequest(saved, requestedRole);
+        return saved;
+    }
+
+    private Booking confirmCancelAcceptedBooking(Booking booking, String confirmerRole, Double lat, Double lng) {
+        if (booking.getStatus() != Booking.Status.ACCEPTED) {
+            throw new RuntimeException("Đơn không còn ở trạng thái ACCEPTED để xác nhận hủy");
+        }
+        if (!Boolean.TRUE.equals(booking.getCancelRequestPending())) {
+            throw new RuntimeException("Chưa có yêu cầu hủy để xác nhận");
+        }
+        String requestedBy = booking.getCancelRequestedByRole();
+        if (requestedBy == null || requestedBy.isBlank()) {
+            throw new RuntimeException("Dữ liệu yêu cầu hủy không hợp lệ");
+        }
+        if (requestedBy.equalsIgnoreCase(confirmerRole)) {
+            throw new RuntimeException("Bạn là bên khởi tạo yêu cầu hủy, cần bên còn lại xác nhận");
+        }
+        requireValidGps(lat, lng);
+        booking.setCancelConfirmerLatitude(lat);
+        booking.setCancelConfirmerLongitude(lng);
+        booking.setCancelConfirmedAt(now());
+        booking.setPendingExtensionMinutes(null);
+        booking.setPendingExtensionRequestedAt(null);
+
+        BigDecimal refundAmount = calculateRefundAmount(booking);
+        if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
+            walletService.refundForBooking(booking.getCustomer(), booking, refundAmount);
+        }
+        clearLiveLocationFields(booking);
+        booking.setStatus(Booking.Status.CANCELLED);
+        booking.setCompletedAt(null);
+        notifyCancelCompleted(booking);
+        emitAdminSameBookingCancelDistanceAlert(booking);
+        resetCancelWorkflowFlagsOnly(booking);
+        return bookingRepository.save(booking);
+    }
+
+    private void notifyCancelRequest(Booking booking, String requestedRole) {
+        Long targetUserId = "CUSTOMER".equalsIgnoreCase(requestedRole)
+                ? booking.getCompanion().getUser().getId()
+                : booking.getCustomer().getId();
+        String actorLabel = "CUSTOMER".equalsIgnoreCase(requestedRole) ? "Khách" : "Companion";
+        notificationService.create(
+                targetUserId,
+                "Yêu cầu hủy đơn",
+                actorLabel + " đã gửi yêu cầu hủy đơn #" + booking.getId() + ". Vui lòng mở đơn để xác nhận hủy cùng GPS."
+        );
+    }
+
+    private void notifyCancelCompleted(Booking booking) {
+        String detail = "Đơn #" + booking.getId() + " đã được hai bên xác nhận hủy bằng GPS.";
+        notificationService.create(booking.getCustomer().getId(), "Booking đã hủy", detail);
+        notificationService.create(booking.getCompanion().getUser().getId(), "Booking đã hủy", detail);
+    }
+
+    private void emitAdminSameBookingCancelDistanceAlert(Booking booking) {
+        Double reqLat = booking.getCancelRequesterLatitude();
+        Double reqLng = booking.getCancelRequesterLongitude();
+        Double cfmLat = booking.getCancelConfirmerLatitude();
+        Double cfmLng = booking.getCancelConfirmerLongitude();
+        if (reqLat == null || reqLng == null || cfmLat == null || cfmLng == null) {
+            return;
+        }
+        double meters = GeoDistanceUtil.metersBetween(reqLat, reqLng, cfmLat, cfmLng);
+        if (meters > cancelAlertDistanceMeters) {
+            return;
+        }
+        String content = String.format(
+                "Đơn #%d có 2 vị trí hủy gần nhau (%d m) giữa 2 bên. Cần kiểm tra nguy cơ đi chui.",
+                booking.getId(),
+                Math.round(meters)
+        );
+        userRepository.findByRole(User.Role.ADMIN).forEach(admin ->
+                notificationService.create(admin.getId(), "Cảnh báo hủy đơn trong bán kính gần", content)
+        );
+        notifyParticipantsCancelRisk(booking);
+    }
+
+    private void notifyParticipantsCancelRisk(Booking booking) {
+        String customerContent = String.format(
+                "Hệ thống ghi nhận vị trí hủy đơn #%d ở khoảng cách gần. Vui lòng tuân thủ quy định để tránh bị cảnh báo/khóa tài khoản.",
+                booking.getId()
+        );
+        String companionContent = String.format(
+                "Hệ thống ghi nhận vị trí hủy đơn #%d ở khoảng cách gần. Vui lòng tuân thủ quy định để tránh bị cảnh báo/khóa tài khoản.",
+                booking.getId()
+        );
+        notificationService.create(
+                booking.getCustomer().getId(),
+                "Cảnh báo hành vi hủy đơn",
+                customerContent
+        );
+        notificationService.create(
+                booking.getCompanion().getUser().getId(),
+                "Cảnh báo hành vi hủy đơn",
+                companionContent
+        );
+    }
+
+    private static void resetCancelWorkflowFlagsOnly(Booking booking) {
+        booking.setCancelRequestPending(false);
+    }
+
+    private static void resetCancelWorkflow(Booking booking) {
+        booking.setCancelRequestPending(false);
+        booking.setCancelRequestedByRole(null);
+        booking.setCancelRequestAt(null);
+        booking.setCancelRequesterLatitude(null);
+        booking.setCancelRequesterLongitude(null);
+        booking.setCancelConfirmerLatitude(null);
+        booking.setCancelConfirmerLongitude(null);
+        booking.setCancelConfirmedAt(null);
     }
 
     /**

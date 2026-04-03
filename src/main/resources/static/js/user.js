@@ -66,6 +66,10 @@ function unwrapOptionalEntity(data) {
     return data;
 }
 
+function isChatAllowedStatus(status) {
+    return status === "ACCEPTED" || status === "IN_PROGRESS";
+}
+
 async function reporterIsLikelyDenied() {
     try {
         if (!navigator.permissions || !navigator.permissions.query) return false;
@@ -327,8 +331,8 @@ async function initSearchPage() {
     const keyword = document.getElementById("keyword");
     const form = document.getElementById("search-form");
     const grid = document.getElementById("companion-grid");
-    form?.addEventListener("submit", async (e) => {
-        e.preventDefault();
+
+    async function runSearch() {
         const q = (keyword.value || "").trim().toLowerCase();
         const params = new URLSearchParams();
         ["serviceType", "area", "gender", "minPrice", "maxPrice", "online"].forEach((id) => {
@@ -342,6 +346,15 @@ async function initSearchPage() {
             return !q || text.includes(q);
         });
         grid.innerHTML = filtered.length ? filtered.map(companionCard).join("") : `<div class="empty-state">Không tìm thấy kết quả phù hợp.</div>`;
+    }
+
+    form?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await runSearch();
+    });
+    document.getElementById("search-filter-btn")?.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await runSearch();
     });
 }
 
@@ -832,7 +845,10 @@ async function initAppointmentsPage(auth) {
           <div class="col-12 mt-2"><strong>Ghi chú:</strong> ${escapeHtml(b.note || "-")}</div>
         </div>
         <div class="d-flex flex-wrap gap-2 mt-3">
-          ${b.status === "PENDING" || b.status === "ACCEPTED" ? `<button class="btn btn-outline-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel">Hủy đơn</button>` : ""}
+          ${b.status === "PENDING" ? `<button class="btn btn-outline-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel">Hủy đơn</button>` : ""}
+          ${b.status === "ACCEPTED" && !b.cancelRequestPending ? `<button class="btn btn-outline-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel-request">Gửi yêu cầu hủy</button>` : ""}
+          ${b.status === "ACCEPTED" && b.cancelRequestPending && b.cancelRequestedByRole === "COMPANION" ? `<button class="btn btn-danger btn-sm booking-action" data-id="${b.id}" data-action="cancel-confirm">Xác nhận hủy</button>` : ""}
+          ${b.status === "ACCEPTED" && b.cancelRequestPending && b.cancelRequestedByRole === "CUSTOMER" ? `<span class="badge bg-warning-subtle text-warning-emphasis border">Đã gửi yêu cầu hủy, chờ companion xác nhận</span>` : ""}
           ${b.status === "ACCEPTED" ? `<button class="btn btn-outline-primary btn-sm booking-action" data-id="${b.id}" data-action="check-in">Check-in</button>` : ""}
           ${b.status === "IN_PROGRESS" ? `<button class="btn btn-success btn-sm booking-action" data-id="${b.id}" data-action="check-out">Check-out</button>` : ""}
           ${canRequestExt ? `<button class="btn btn-outline-secondary btn-sm booking-action" data-id="${b.id}" data-action="extend">Xin gia hạn +30 phút</button>` : ""}
@@ -905,6 +921,26 @@ async function initAppointmentsPage(auth) {
                     }
                     res = await apiFetch(`/api/bookings/me/${id}/check-out`, {
                         method: "PATCH",
+                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng })
+                    });
+                } else if (action === "cancel-request") {
+                    const pos = await getReporterGps();
+                    if (pos.lat == null || pos.lng == null) {
+                        alert("Không lấy được GPS. Bật định vị và cho phép trình duyệt để gửi yêu cầu hủy.");
+                        return;
+                    }
+                    res = await apiFetch(`/api/bookings/me/${id}/cancel-request`, {
+                        method: "POST",
+                        body: JSON.stringify({ lat: pos.lat, lng: pos.lng })
+                    });
+                } else if (action === "cancel-confirm") {
+                    const pos = await getReporterGps();
+                    if (pos.lat == null || pos.lng == null) {
+                        alert("Không lấy được GPS. Bật định vị và cho phép trình duyệt để xác nhận hủy.");
+                        return;
+                    }
+                    res = await apiFetch(`/api/bookings/me/${id}/cancel-confirm`, {
+                        method: "POST",
                         body: JSON.stringify({ lat: pos.lat, lng: pos.lng })
                     });
                 } else if (action === "extend") {
@@ -1007,14 +1043,20 @@ async function initReviewPage(auth) {
     });
 
     const bookingSelect = document.getElementById("bookingId");
-    const bookingsRes = await apiFetch("/api/bookings/me", { headers: {} });
-    const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
-    const completed = bookings.filter((b) => b.status === "COMPLETED");
-    bookingSelect.innerHTML = completed.map((b) => `<option value="${b.id}">#${b.id} - ${escapeHtml(b.companion?.user?.username || "Companion")} (${escapeHtml(formatDateTime(b.bookingTime))})</option>`).join("");
-    if (!completed.length) {
-        bookingSelect.innerHTML = `<option value="">Không có lịch hẹn đã hoàn thành</option>`;
+
+    async function loadMyReviews() {
+        const res = await apiFetch("/api/reviews/me", { headers: {} });
+        const reviews = res.ok ? await res.json() : [];
+        const box = document.getElementById("review-list");
+        box.innerHTML = reviews.length ? reviews.map((r) => `
+            <div class="card user-card mb-2"><div class="card-body">
+              <div><strong>Booking #${r.booking?.id || "-"}</strong> - ${"★".repeat(r.rating || 0)}</div>
+              <div class="text-muted small">${escapeHtml(formatDateTime(r.createdAt))}</div>
+              <div>${escapeHtml(r.comment || "")}</div>
+            </div></div>`).join("") : `<div class="empty-state">Bạn chưa có đánh giá nào.</div>`;
     }
 
+    // Gắn submit trước khi await /api/bookings/me để E2E không bấm khi form chưa có preventDefault (reload trang).
     document.getElementById("review-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
         const bookingId = Number(bookingSelect.value);
@@ -1040,16 +1082,12 @@ async function initReviewPage(auth) {
         }
     });
 
-    async function loadMyReviews() {
-        const res = await apiFetch("/api/reviews/me", { headers: {} });
-        const reviews = res.ok ? await res.json() : [];
-        const box = document.getElementById("review-list");
-        box.innerHTML = reviews.length ? reviews.map((r) => `
-            <div class="card user-card mb-2"><div class="card-body">
-              <div><strong>Booking #${r.booking?.id || "-"}</strong> - ${"★".repeat(r.rating || 0)}</div>
-              <div class="text-muted small">${escapeHtml(formatDateTime(r.createdAt))}</div>
-              <div>${escapeHtml(r.comment || "")}</div>
-            </div></div>`).join("") : `<div class="empty-state">Bạn chưa có đánh giá nào.</div>`;
+    const bookingsRes = await apiFetch("/api/bookings/me", { headers: {} });
+    const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
+    const completed = bookings.filter((b) => b.status === "COMPLETED");
+    bookingSelect.innerHTML = completed.map((b) => `<option value="${b.id}">#${b.id} - ${escapeHtml(b.companion?.user?.username || "Companion")} (${escapeHtml(formatDateTime(b.bookingTime))})</option>`).join("");
+    if (!completed.length) {
+        bookingSelect.innerHTML = `<option value="">Không có lịch hẹn đã hoàn thành</option>`;
     }
 
     await loadMyReviews();
@@ -1333,7 +1371,7 @@ async function initChatPage(auth) {
                 status: b.status || "-",
                 bookingTime: b.bookingTime
             };
-        }).filter((t) => t.bookingId > 0);
+        }).filter((t) => t.bookingId > 0 && isChatAllowedStatus(t.status));
     }
 
     function renderThreadList() {
@@ -1393,7 +1431,7 @@ async function initChatPage(auth) {
 
         const pickPreferred = (list) => {
             if (!Array.isArray(list) || !list.length) return 0;
-            const preferred = list.find((b) => ["IN_PROGRESS", "ACCEPTED", "COMPLETED"].includes(b.status));
+            const preferred = list.find((b) => isChatAllowedStatus(b.status));
             return Number((preferred || list[0]).id || 0);
         };
 
@@ -1421,7 +1459,12 @@ async function initChatPage(auth) {
             return;
         }
         const res = await apiFetch(`/api/chat/${currentBookingId}/messages`, { headers: {} });
-        const list = res.ok ? await res.json() : [];
+        if (!res.ok) {
+            const msg = await parseApiErrorMessage(res, "Không thể tải tin nhắn.");
+            box.innerHTML = `<div class="text-muted">${escapeHtml(msg)}</div>`;
+            return;
+        }
+        const list = await res.json();
         box.innerHTML = list.map((m) => `<div class="mb-2"><strong>${escapeHtml(m.sender?.username || "user")}:</strong> ${escapeHtml(m.content)} <span class="text-muted small">(${escapeHtml(formatDateTime(m.createdAt))})</span></div>`).join("") || `<div class="text-muted">Chưa có tin nhắn.</div>`;
         box.scrollTop = box.scrollHeight;
     }
@@ -1739,6 +1782,22 @@ async function bootstrap() {
     const page = document.body.dataset.page;
     const auth = await getAuth().catch(() => ({ authenticated: false }));
     renderTopNav(auth);
+    if (page === "login" || page === "register") {
+        initAuthPages();
+        return;
+    }
+    // Khởi tạo trang trước WebSocket để form/listener sẵn sàng (tránh E2E/độ trễ kết nối).
+    if (page === "index") await initIndexPage();
+    if (page === "search") await initSearchPage();
+    if (page === "profile") await initProfilePage(auth);
+    if (page === "booking") await initBookingPage(auth);
+    if (page === "appointments") await initAppointmentsPage(auth);
+    if (page === "favorites") await initFavoritesPage(auth);
+    if (page === "review") await initReviewPage(auth);
+    if (page === "report") await initReportPage(auth);
+    if (page === "wallet") await initWalletPage(auth);
+    if (page === "chat") await initChatPage(auth);
+    if (page === "notifications") await initNotificationsPage(auth);
     if (auth.authenticated) {
         await refreshNotifications();
         if (auth.userId && window.RealtimeStomp) {
@@ -1761,21 +1820,6 @@ async function bootstrap() {
             setInterval(refreshNotifications, 5000);
         }
     }
-    if (page === "login" || page === "register") {
-        initAuthPages();
-        return;
-    }
-    if (page === "index") await initIndexPage();
-    if (page === "search") await initSearchPage();
-    if (page === "profile") await initProfilePage(auth);
-    if (page === "booking") await initBookingPage(auth);
-    if (page === "appointments") await initAppointmentsPage(auth);
-    if (page === "favorites") await initFavoritesPage(auth);
-    if (page === "review") await initReviewPage(auth);
-    if (page === "report") await initReportPage(auth);
-    if (page === "wallet") await initWalletPage(auth);
-    if (page === "chat") await initChatPage(auth);
-    if (page === "notifications") await initNotificationsPage(auth);
 }
 
 document.addEventListener("DOMContentLoaded", bootstrap);

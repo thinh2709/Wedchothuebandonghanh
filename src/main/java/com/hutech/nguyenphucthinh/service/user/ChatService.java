@@ -42,6 +42,9 @@ public class ChatService {
         if (!isCustomer && !isCompanion) {
             throw new RuntimeException("Bạn không có quyền truy cập đơn đặt lịch này");
         }
+        if (booking.getStatus() != Booking.Status.ACCEPTED && booking.getStatus() != Booking.Status.IN_PROGRESS) {
+            throw new RuntimeException("Chỉ chat/call khi đơn ở trạng thái ACCEPTED hoặc IN_PROGRESS");
+        }
         return booking;
     }
 

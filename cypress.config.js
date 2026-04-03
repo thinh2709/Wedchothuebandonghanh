@@ -4,7 +4,26 @@ module.exports = defineConfig({
   e2e: {
     baseUrl: 'http://localhost:8080',
     specPattern: 'cypress/e2e/**/*.cy.js',
-    supportFile: false,
-    video: false
+    supportFile: 'cypress/support/e2e.js',
+    video: false,
+    /**
+     * Mặc định khớp RealisticDataSeeder + DbTestModerationSeeder (profile dbtest, DB rental_companion_db_test).
+     * Ghi đè bằng cypress.env.json nếu dùng DB/tài khoản khác.
+     */
+    env: {
+      E2E_REGISTER_RANDOM: false,
+      TEST_USER: 'minhchau1',
+      TEST_PASS: '123456',
+      TEST_ADMIN_USER: 'thinh270924@gmail.com',
+      TEST_ADMIN_PASS: '123456',
+      TEST_COMPANION_USER: 'anhkhoa10',
+      TEST_COMPANION_PASS: '123456',
+      TEST_LOCKED_USER: 'e2e_locked',
+      TEST_LOCKED_PASS: '123456',
+      TEST_BANNED_USER: 'e2e_banned',
+      TEST_BANNED_PASS: '123456',
+      TEST_WARNED_USER: 'e2e_warned',
+      TEST_WARNED_PASS: '123456'
+    }
   }
 });

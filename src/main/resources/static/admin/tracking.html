@@ -73,6 +73,9 @@
                                 <span class="me-2"><span style="background:#2563eb"></span>Khách</span>
                                 <span class="me-2"><span style="background:#16a34a"></span>Companion</span>
                                 <span class="me-2"><span style="background:#7c3aed"></span>Điểm hẹn</span>
+                                <span class="me-2"><span style="background:#b45309"></span>Hủy (khởi tạo)</span>
+                                <span class="me-2"><span style="background:#0f766e"></span>Hủy (xác nhận)</span>
+                                <span class="me-2"><span style="background:#be123c"></span>Tâm điểm hủy</span>
                                 <span class="me-2"><span style="background:#dc2626"></span>Live</span>
                                 <span><span style="background:#f97316"></span>Đường đi</span>
                             </div>
@@ -84,6 +87,26 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mt-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="fw-semibold">Cảnh báo hủy đơn (GPS gần nhau)</span>
+                    <span class="small text-muted">Nguồn: thông báo realtime gửi cho admin</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 small">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>Tiêu đề</th>
+                            <th>Nội dung</th>
+                            <th>Đã đọc</th>
+                        </tr>
+                        </thead>
+                        <tbody id="admin-cancel-alerts-body" data-cy="admin-cancel-alerts-body"></tbody>
+                    </table>
                 </div>
             </div>
         </main>

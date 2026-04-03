@@ -33,6 +33,7 @@ cypress/downloads/
 # Environment / secrets
 .env
 .env.*
+cypress.env.json
 
 # Keystore HTTPS dev LAN (application-https-lan.properties)
 dev-lan.p12

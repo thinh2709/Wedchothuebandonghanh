@@ -246,6 +246,40 @@ public class CompanionController {
         );
     }
 
+    @PostMapping("/me/bookings/{bookingId}/cancel-request")
+    public Booking requestCancelBooking(
+            @PathVariable Long bookingId,
+            @RequestBody Map<String, Object> request,
+            HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return bookingService.requestCancelByCompanion(
+                userId,
+                bookingId,
+                RequestBodyParseUtil.readDouble(request, "lat"),
+                RequestBodyParseUtil.readDouble(request, "lng")
+        );
+    }
+
+    @PostMapping("/me/bookings/{bookingId}/cancel-confirm")
+    public Booking confirmCancelBooking(
+            @PathVariable Long bookingId,
+            @RequestBody Map<String, Object> request,
+            HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            throw new RuntimeException("Please login first");
+        }
+        return bookingService.confirmCancelByCompanion(
+                userId,
+                bookingId,
+                RequestBodyParseUtil.readDouble(request, "lat"),
+                RequestBodyParseUtil.readDouble(request, "lng")
+        );
+    }
+
     @PostMapping("/me/bookings/{bookingId}/sos")
     public Booking triggerSos(@PathVariable Long bookingId, @RequestBody Map<String, Object> request, HttpSession session) {
         Long userId = (Long) session.getAttribute("userId");

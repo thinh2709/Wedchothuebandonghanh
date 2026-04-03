@@ -538,6 +538,18 @@ public class AdminService {
         m.put("customerCheckOut", gpsPoint(b.getCustomerCheckOutLatitude(), b.getCustomerCheckOutLongitude()));
         m.put("companionCheckOut", gpsPoint(b.getCompanionCheckOutLatitude(), b.getCompanionCheckOutLongitude()));
         m.put("checkOut", gpsPoint(b.getCheckOutLatitude(), b.getCheckOutLongitude()));
+        m.put("cancelRequester", gpsPoint(b.getCancelRequesterLatitude(), b.getCancelRequesterLongitude()));
+        m.put("cancelConfirmer", gpsPoint(b.getCancelConfirmerLatitude(), b.getCancelConfirmerLongitude()));
+        m.put(
+                "cancelMerged",
+                mergedGpsPoint(
+                        b.getCancelRequesterLatitude(), b.getCancelRequesterLongitude(),
+                        b.getCancelConfirmerLatitude(), b.getCancelConfirmerLongitude()
+                )
+        );
+        m.put("cancelRequestedByRole", b.getCancelRequestedByRole());
+        m.put("cancelRequestAt", b.getCancelRequestAt() != null ? b.getCancelRequestAt().toString() : null);
+        m.put("cancelConfirmedAt", b.getCancelConfirmedAt() != null ? b.getCancelConfirmedAt().toString() : null);
         return m;
     }
 
@@ -547,6 +559,13 @@ public class AdminService {
         p.put("longitude", lng);
         p.put("set", lat != null && lng != null && !Double.isNaN(lat) && !Double.isNaN(lng));
         return p;
+    }
+
+    private static Map<String, Object> mergedGpsPoint(Double lat1, Double lng1, Double lat2, Double lng2) {
+        if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) {
+            return gpsPoint(null, null);
+        }
+        return gpsPoint((lat1 + lat2) / 2.0, (lng1 + lng2) / 2.0);
     }
 
     private Report validateReportExists(Long reportId) {

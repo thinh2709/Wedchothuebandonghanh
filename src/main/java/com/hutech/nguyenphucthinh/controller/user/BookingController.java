@@ -54,6 +54,30 @@ public class BookingController {
         return bookingService.cancelBooking(userId, bookingId);
     }
 
+    @PostMapping("/me/{bookingId}/cancel-request")
+    public Booking requestCancel(
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+        Double lat = RequestBodyParseUtil.readDouble(body, "lat");
+        Double lng = RequestBodyParseUtil.readDouble(body, "lng");
+        return bookingService.requestCancelByCustomer(userId, bookingId, lat, lng);
+    }
+
+    @PostMapping("/me/{bookingId}/cancel-confirm")
+    public Booking confirmCancel(
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) throw new RuntimeException("Please login first");
+        Double lat = RequestBodyParseUtil.readDouble(body, "lat");
+        Double lng = RequestBodyParseUtil.readDouble(body, "lng");
+        return bookingService.confirmCancelByCustomer(userId, bookingId, lat, lng);
+    }
+
     @PatchMapping("/me/{bookingId}/check-in")
     public Booking checkIn(
             @PathVariable Long bookingId,

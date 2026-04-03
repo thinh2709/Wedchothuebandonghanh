@@ -936,6 +936,9 @@ function renderAdminTrackingDetail(detail) {
     const cOut = detail.customerCheckOut || {};
     const pOut = detail.companionCheckOut || {};
     const co = detail.checkOut || {};
+    const cancelRequester = detail.cancelRequester || {};
+    const cancelConfirmer = detail.cancelConfirmer || {};
+    const cancelMerged = detail.cancelMerged || {};
     info.innerHTML = `
         <div class="small">
             <div><strong>Đơn #${detail.id}</strong> · <span class="badge text-bg-secondary">${escapeHtml(st)}</span></div>
@@ -959,6 +962,12 @@ function renderAdminTrackingDetail(detail) {
                     ? `${Number(live.latitude).toFixed(5)}, ${Number(live.longitude).toFixed(5)} (${escapeHtml(live.role || "")})`
                     : "chưa có"
             }</div>
+            <div class="mt-2"><strong>GPS hủy đơn</strong></div>
+            <ul class="mb-1 ps-3">
+                <li>Bên khởi tạo: ${cancelRequester.set ? `${Number(cancelRequester.latitude).toFixed(5)}, ${Number(cancelRequester.longitude).toFixed(5)}` : "chưa có"}</li>
+                <li>Bên xác nhận: ${cancelConfirmer.set ? `${Number(cancelConfirmer.latitude).toFixed(5)}, ${Number(cancelConfirmer.longitude).toFixed(5)}` : "chưa có"}</li>
+                <li>Tâm điểm hủy: ${cancelMerged.set ? `${Number(cancelMerged.latitude).toFixed(5)}, ${Number(cancelMerged.longitude).toFixed(5)}` : "chưa có"}</li>
+            </ul>
         </div>
     `;
 }
@@ -977,6 +986,9 @@ function fitAdminTrackingBoundsFromDetail(detail) {
     const cOut = detail.customerCheckOut || {};
     const pOut = detail.companionCheckOut || {};
     const co = detail.checkOut || {};
+    const cancelRequester = detail.cancelRequester || {};
+    const cancelConfirmer = detail.cancelConfirmer || {};
+    const cancelMerged = detail.cancelMerged || {};
     push(cIn.latitude, cIn.longitude);
     push(pIn.latitude, pIn.longitude);
     push(merged.latitude, merged.longitude);
@@ -984,6 +996,9 @@ function fitAdminTrackingBoundsFromDetail(detail) {
     push(cOut.latitude, cOut.longitude);
     push(pOut.latitude, pOut.longitude);
     push(co.latitude, co.longitude);
+    push(cancelRequester.latitude, cancelRequester.longitude);
+    push(cancelConfirmer.latitude, cancelConfirmer.longitude);
+    push(cancelMerged.latitude, cancelMerged.longitude);
     if (!pts.length || !adminTrackingState.map) {
         return;
     }
@@ -1003,12 +1018,18 @@ function drawAdminTrackingStaticMarkers(detail) {
     const cOut = detail.customerCheckOut || {};
     const pOut = detail.companionCheckOut || {};
     const co = detail.checkOut || {};
+    const cancelRequester = detail.cancelRequester || {};
+    const cancelConfirmer = detail.cancelConfirmer || {};
+    const cancelMerged = detail.cancelMerged || {};
     addAdminTrackingCircleMarker(cIn.latitude, cIn.longitude, "#2563eb", "Check-in khách");
     addAdminTrackingCircleMarker(pIn.latitude, pIn.longitude, "#16a34a", "Check-in companion");
     addAdminTrackingCircleMarker(merged.latitude, merged.longitude, "#7c3aed", "Điểm hẹn sau đối chiếu");
     addAdminTrackingCircleMarker(cOut.latitude, cOut.longitude, "#f97316", "Check-out khách");
     addAdminTrackingCircleMarker(pOut.latitude, pOut.longitude, "#c2410c", "Check-out companion");
     addAdminTrackingCircleMarker(co.latitude, co.longitude, "#64748b", "Check-out sau đối chiếu");
+    addAdminTrackingCircleMarker(cancelRequester.latitude, cancelRequester.longitude, "#b45309", "GPS hủy: bên khởi tạo");
+    addAdminTrackingCircleMarker(cancelConfirmer.latitude, cancelConfirmer.longitude, "#0f766e", "GPS hủy: bên xác nhận");
+    addAdminTrackingCircleMarker(cancelMerged.latitude, cancelMerged.longitude, "#be123c", "GPS hủy: tâm điểm");
     if (live.latitude != null && live.longitude != null) {
         adminTrackingState.liveMarker = L.circleMarker([Number(live.latitude), Number(live.longitude)], {
             radius: 10,
@@ -1137,9 +1158,57 @@ async function loadAdminTrackingList() {
     });
 }
 
+function isCancelAlertNotification(notification) {
+    const text = `${notification?.title || ""} ${notification?.content || ""}`.toLowerCase();
+    if (!text.includes("hủy")) return false;
+    return (
+        text.includes("gần nhau")
+        || text.includes("bán kính")
+        || text.includes("gps")
+        || text.includes("đi chui")
+    );
+}
+
+async function loadAdminCancelAlerts() {
+    const tbody = document.getElementById("admin-cancel-alerts-body");
+    if (!tbody) {
+        return;
+    }
+    const notifications = await requestJson("/api/admin/notifications/me");
+    const alerts = (Array.isArray(notifications) ? notifications : [])
+        .filter(isCancelAlertNotification)
+        .slice(0, 100);
+    tbody.innerHTML = "";
+    if (!alerts.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Chưa có cảnh báo hủy đơn gần nhau.</td></tr>';
+        return;
+    }
+    alerts.forEach((n) => {
+        const tr = document.createElement("tr");
+        const bookingMatch = String(n.content || "").match(/đơn\s*#\s*(\d+)/i);
+        const bookingId = bookingMatch ? Number(bookingMatch[1]) : null;
+        tr.innerHTML = `
+            <td>${escapeHtml(fmtDateTimeAdmin(n.createdAt) || "")}</td>
+            <td>${escapeHtml(n.title || "")}</td>
+            <td>${escapeHtml(n.content || "")}</td>
+            <td>
+                ${n.isRead ? '<span class="badge text-bg-secondary me-1">Đã đọc</span>' : '<span class="badge text-bg-warning me-1">Mới</span>'}
+                ${bookingId ? `<button class="btn btn-sm btn-outline-primary" data-booking-id="${bookingId}">Xem map</button>` : ""}
+            </td>
+        `;
+        if (bookingId) {
+            tr.querySelector("button[data-booking-id]")?.addEventListener("click", () => {
+                selectBookingForTracking(bookingId).catch(() => {});
+            });
+        }
+        tbody.appendChild(tr);
+    });
+}
+
 async function initAdminTrackingPage() {
     ensureAdminTrackingMap();
     await loadAdminTrackingList();
+    await loadAdminCancelAlerts();
     if (adminTrackingState.map) {
         setTimeout(() => adminTrackingState.map.invalidateSize(), 250);
     }
@@ -1259,6 +1328,9 @@ async function pollAdminRealtimeNotifications() {
     try {
         const list = await requestJson("/api/admin/notifications/me");
         processAdminRealtimeNotifications(list);
+        if (window.location.pathname.endsWith("/tracking.html")) {
+            await loadAdminCancelAlerts();
+        }
     } catch (_) {
         // avoid blocking admin dashboard on transient errors
     }
@@ -1377,6 +1449,7 @@ function setupPageEvents() {
         document.getElementById("reload-tracking-btn")?.addEventListener("click", async () => {
             clearAlert();
             await loadAdminTrackingList();
+            await loadAdminCancelAlerts();
             if (adminTrackingState.selectedId) {
                 await selectBookingForTracking(adminTrackingState.selectedId);
             }
