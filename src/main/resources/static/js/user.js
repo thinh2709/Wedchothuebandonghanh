@@ -35,40 +35,7 @@ async function apiFetch(url, options = {}) {
     return res;
 }
 
-function escapeHtml(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-function formatDateTime(value) {
-    if (!value) return "-";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString("vi-VN");
-}
-
-/** Giống backend RentalVenuesUtil: mỗi dòng là một nơi thuê. */
-function parseRentalVenuesLines(text) {
-    return String(text || "")
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-}
-
-/** Một số phiên bản Spring có thể serialize Optional thành { present, value }. */
-function unwrapOptionalEntity(data) {
-    if (data && typeof data === "object" && "value" in data && data.value != null && typeof data.value === "object" && "id" in data.value) {
-        return data.value;
-    }
-    return data;
-}
-
-function isChatAllowedStatus(status) {
-    return status === "ACCEPTED" || status === "IN_PROGRESS";
-}
+/* escapeHtml, formatDateTime, parseRentalVenuesLines, unwrapOptionalEntity, isChatAllowedStatus: user-pure.js */
 
 async function reporterIsLikelyDenied() {
     try {

@@ -241,28 +241,9 @@ public class CompanionService {
 
     public List<Companion> searchCompanions(String serviceType, String area, String gender,
                                             Boolean online, BigDecimal minPrice, BigDecimal maxPrice) {
-        return getAllCompanions().stream().filter(c -> {
-            boolean ok = true;
-            if (serviceType != null && !serviceType.isBlank()) ok = ok && serviceType.equalsIgnoreCase(c.getServiceType());
-            if (area != null && !area.isBlank()) ok = ok && c.getArea() != null && c.getArea().toLowerCase().contains(area.toLowerCase());
-            if (gender != null && !gender.isBlank()) ok = ok && gender.equalsIgnoreCase(c.getGender());
-            if (online != null) ok = ok && online.equals(c.getOnlineStatus());
-            BigDecimal cMin = c.getServicePriceMin();
-            BigDecimal cMax = c.getServicePriceMax();
-            if (cMin == null || cMax == null) {
-                BigDecimal p = c.getPricePerHour() != null ? c.getPricePerHour() : BigDecimal.valueOf(200000);
-                cMin = p;
-                cMax = p;
-            }
-            if (minPrice != null && maxPrice != null) {
-                ok = ok && cMax.compareTo(minPrice) >= 0 && cMin.compareTo(maxPrice) <= 0;
-            } else if (minPrice != null) {
-                ok = ok && cMax.compareTo(minPrice) >= 0;
-            } else if (maxPrice != null) {
-                ok = ok && cMin.compareTo(maxPrice) <= 0;
-            }
-            return ok;
-        }).toList();
+        return getAllCompanions().stream()
+                .filter(c -> CompanionSearchCriteriaMatcher.matches(c, serviceType, area, gender, online, minPrice, maxPrice))
+                .toList();
     }
 
     public List<CompanionAvailability> getAvailabilities(Long userId) {

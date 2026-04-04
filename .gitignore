@@ -1,5 +1,11 @@
 # Maven / Java
 target/
+# JaCoCo (HTML/XML/CSV) — sinh sau mvn test, mở coverage-report/index.html
+coverage-report/
+# Surefire HTML — sinh sau mvn test, mở test-report/surefire.html
+test-report/
+# Trang mục lục báo cáo — mở bao-cao/index.html
+bao-cao/
 *.class
 *.jar
 *.war

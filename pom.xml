@@ -28,6 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
+		<jacoco.version>0.8.13</jacoco.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -82,6 +83,14 @@
 
 	<build>
 		<plugins>
+			<!-- JaCoCo prepare-agent ghi vào biến argLine; Surefire 3.x + JDK mới phải truyền @{argLine} vào JVM test, nếu không jacoco.exec gần như trống và báo cáo luôn 0%. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<argLine>@{argLine}</argLine>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -104,6 +113,123 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+				</configuration>
+			</plugin>
+			<!-- Báo cáo độ bao phủ: mvn test → coverage-report/index.html. Chỉ các class tách theo phạ vi white-box mục 4.1–4.4 (Báo cáo môn Chiều T4.md). includes chỉ trên goal report. -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<executions>
+					<execution>
+						<id>jacoco-prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+						<configuration>
+							<includes>
+								<include>**/com/hutech/nguyenphucthinh/service/companion/CompanionSearchCriteriaMatcher*</include>
+								<include>**/com/hutech/nguyenphucthinh/service/user/ReviewService*</include>
+								<include>**/com/hutech/nguyenphucthinh/service/user/UserLoginService*</include>
+								<include>**/com/hutech/nguyenphucthinh/controller/user/UserLoginController*</include>
+								<include>**/com/hutech/nguyenphucthinh/service/user/WalletDepositService*</include>
+								<include>**/com/hutech/nguyenphucthinh/controller/user/WalletDepositController*</include>
+							</includes>
+						</configuration>
+					</execution>
+				</executions>
+				<configuration>
+					<outputDirectory>${project.basedir}/coverage-report</outputDirectory>
+					<formats>
+						<format>HTML</format>
+						<format>XML</format>
+					</formats>
+				</configuration>
+			</plugin>
+			<!-- Báo cáo kết quả test (HTML chuẩn Maven Surefire): mvn test → test-report/surefire.html -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-report-plugin</artifactId>
+				<version>3.5.4</version>
+				<executions>
+					<execution>
+						<id>generate-surefire-html</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<outputDirectory>${project.basedir}/test-report</outputDirectory>
+					<showSuccess>true</showSuccess>
+				</configuration>
+			</plugin>
+			<!-- Trang mục lục: tự tạo sau mỗi lần mvn test — mở bao-cao/index.html -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>write-reports-hub-html</id>
+						<phase>test</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<mkdir dir="${project.basedir}/bao-cao"/>
+								<tstamp>
+									<format property="hub.time" pattern="yyyy-MM-dd HH:mm"/>
+								</tstamp>
+								<echo file="${project.basedir}/bao-cao/index.html" encoding="UTF-8">&lt;!DOCTYPE html&gt;
+&lt;html lang="vi"&gt;&lt;head&gt;&lt;meta charset="UTF-8"/&gt;&lt;meta name="viewport" content="width=device-width,initial-scale=1"/&gt;
+&lt;title&gt;Báo cáo test &amp; coverage&lt;/title&gt;
+&lt;style&gt;
+body{font-family:Segoe UI,system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.55;color:#1a1a1a}
+h1{font-size:1.35rem}
+.card{border:1px solid #ddd;border-radius:8px;padding:1rem 1.25rem;margin:1rem 0;background:#fafafa}
+a{color:#0b57d0;font-weight:600;text-decoration:none}
+a:hover{text-decoration:underline}
+small{color:#666;display:block;margin-top:1.25rem}
+code{background:#eee;padding:.15rem .4rem;border-radius:4px;font-size:.9em}
+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;
+&lt;h1&gt;Báo cáo (tự tạo khi chạy &lt;code&gt;mvn test&lt;/code&gt;)&lt;/h1&gt;
+&lt;p&gt;Cập nhật: ${hub.time}&lt;/p&gt;
+&lt;div class="card"&gt;&lt;p&gt;&lt;a href="../test-report/surefire.html"&gt;Kết quả unit test (Surefire HTML)&lt;/a&gt;&lt;/p&gt;
+&lt;p style="margin:.5rem 0 0;font-size:.9rem;color:#444"&gt;Pass/fail từng class, thời gian, lỗi chi tiết.&lt;/p&gt;&lt;/div&gt;
+&lt;div class="card"&gt;&lt;p&gt;&lt;a href="../coverage-report/index.html"&gt;Độ bao phủ code (JaCoCo)&lt;/a&gt;&lt;/p&gt;
+&lt;p style="margin:.5rem 0 0;font-size:.9rem;color:#444"&gt;Chỉ các class phạ vi white-box mục 4.1–4.4 (Đăng nhập, Lọc tìm kiếm, Review, Nạp ví) — khớp &lt;em&gt;Báo cáo môn Chiều T4.md&lt;/em&gt;.&lt;/p&gt;&lt;/div&gt;
+&lt;small&gt;Lệnh gợi ý: &lt;code&gt;mvnw.cmd clean test&lt;/code&gt; — chạy test từ IDE không chạy các bước Maven này thì file không cập nhật.&lt;/small&gt;
+&lt;/body&gt;&lt;/html&gt;</echo>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-clean-plugin</artifactId>
+				<configuration>
+					<filesets>
+						<fileset>
+							<directory>coverage-report</directory>
+						</fileset>
+						<fileset>
+							<directory>test-report</directory>
+						</fileset>
+						<fileset>
+							<directory>bao-cao</directory>
+						</fileset>
+					</filesets>
 				</configuration>
 			</plugin>
 		</plugins>

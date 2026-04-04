@@ -19,26 +19,15 @@ public class WalletService {
     @Autowired
     private WalletTransactionRepository walletTransactionRepository;
 
+    @Autowired
+    private WalletDepositService walletDepositService;
+
     public User getUser(Long userId) {
         return userRepository.findById(userId).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
     }
 
     public User deposit(Long userId, BigDecimal amount, String provider) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RuntimeException("Số tiền nạp phải lớn hơn 0");
-        }
-        User user = getUser(userId);
-        user.setBalance(user.getBalance().add(amount));
-        userRepository.save(user);
-
-        WalletTransaction tx = new WalletTransaction();
-        tx.setUser(user);
-        tx.setAmount(amount);
-        tx.setType(WalletTransaction.Type.DEPOSIT);
-        tx.setProvider(provider == null || provider.isBlank() ? "MANUAL" : provider);
-        tx.setDescription("Nạp tiền vào ví");
-        walletTransactionRepository.save(tx);
-        return user;
+        return walletDepositService.deposit(userId, amount, provider);
     }
 
     public void holdForBooking(User user, Booking booking, BigDecimal amount) {
